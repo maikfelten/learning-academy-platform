@@ -1,7 +1,7 @@
 /**
- * Development mode: starts the API server (5180) and Vite (5173) together.
- * For a demo or for production use the start script instead - it builds the
- * frontend and serves everything from a single port.
+ * Entwicklungsmodus: startet API-Server (5180) und Vite (5173) gemeinsam.
+ * Zum Vorführen wird nicht dieser Modus genutzt, sondern
+ * "Schulungsplattform starten.cmd" (gebautes Frontend, ein Port).
  */
 
 import { spawn } from 'node:child_process'
@@ -11,17 +11,21 @@ import { fileURLToPath } from 'node:url'
 const wurzel = join(dirname(fileURLToPath(import.meta.url)), '..')
 const istWindows = process.platform === 'win32'
 
-function starte(name, befehl, argumente) {
-  const kind = spawn(befehl, argumente, { cwd: wurzel, stdio: 'inherit', shell: istWindows })
+function starte(name, cmd, argumente) {
+  const kind = spawn(cmd, argumente, {
+    cwd: wurzel,
+    stdio: 'inherit',
+    shell: true
+  })
   kind.on('exit', (code) => {
-    console.log(`[${name}] exited (${code})`)
+    console.log(`[${name}] beendet (${code})`)
     process.exit(code ?? 0)
   })
   return kind
 }
 
-const server = starte('server', process.execPath, [join('server', 'index.js')])
-const vite = starte('vite', istWindows ? 'npx.cmd' : 'npx', ['vite'])
+const server = starte('server', process.execPath, ['server/index.js'])
+const vite = starte('vite', 'npm', ['run', 'client'])
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
@@ -31,4 +35,4 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   })
 }
 
-console.log('\nDevelopment mode: interface on http://localhost:5173 — API on http://localhost:5180\n')
+console.log('\nEntwicklungsmodus: Oberfläche auf http://localhost:5173 — API auf http://localhost:5180\n')

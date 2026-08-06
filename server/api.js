@@ -1,7 +1,6 @@
 /**
- * HTTP API. Contains no SQL - every query goes through server/repo.js.
- * Roles: admin (everything), fuehrungskraft (read-only, own department),
- * lernender (own courses only).
+ * API der Plattform. Kennt kein SQL - alles läuft über server/repo.js.
+ * Rollen: admin (alles), fuehrungskraft (lesend, eigener Bereich), lernender.
  */
 
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
@@ -11,7 +10,11 @@ import { hashPassword, passwortRegelnPruefen, verifyPassword } from './auth.js'
 import { MEDIA_DIR, UPLOAD_DIR, db } from './db.js'
 import { isPast, nowIso, safeFileName } from './util.js'
 import { zertifikatPdf } from './certificate.js'
+import { levelBerechnen } from './level.js'
 import { konfiguration, oeffentlicheKonfiguration } from './config.js'
+import * as admin from './admin.js'
+import * as performance from './performance.js'
+import { streamTokenErzeugen } from './stream.js'
 
 export class HttpError extends Error {
   constructor(status, message, extra = {}) {
@@ -23,7 +26,7 @@ export class HttpError extends Error {
 
 const KATEGORIEN = ['Pflichtschulungen', 'KI & Digitales', 'Technik', 'Sicherheit & Qualität', 'Zusammenarbeit']
 
-/* ------------------------------------------------------------ View assembly */
+/* --------------------------------------------------------------- Aufbereitung */
 
 function kursKarte(user, kurs, pflicht, gespeichert) {
   const st = repo.kursStatus(user, kurs, pflicht)
@@ -117,6 +120,7 @@ function oeffentlicherUser(u) {
     position: u.position,
     eintrittsdatum: u.eintrittsdatum,
     passwort_wechsel: !!u.passwort_wechsel,
+    level: levelBerechnen(repo.abschlussAnzahl(u.id)),
     initialen: u.name
       .split(/\s+/)
       .map((t) => t[0])
@@ -128,7 +132,9 @@ function oeffentlicherUser(u) {
 
 function kursDetail(user, kurs, pflicht) {
   const st = repo.kursStatus(user, kurs, pflicht)
-  const alle = repo.lektionen(kurs.id)
+  // Zurückgehaltene Lektionen sieht nur der Admin - für alle anderen existieren
+  // sie schlicht nicht, auch nicht in der Zählung des Fortschritts.
+  const alle = repo.lektionen(kurs.id, user.rolle !== 'admin')
   const fs = repo.fortschritt(user.id, kurs.id, st.zyklus_start)
 
   let ersteOffene = null
@@ -136,7 +142,7 @@ function kursDetail(user, kurs, pflicht) {
     const p = fs.detail.get(l.id)
     const erledigt = p?.status === 'abgeschlossen'
     if (!erledigt && ersteOffene === null) ersteOffene = i
-    // Strict courses: lesson n unlocks only once lesson n-1 is done.
+    // Strenge Kurse: Lektion n ist erst frei, wenn n-1 erledigt ist.
     const vorherErledigt = i === 0 || fs.detail.get(alle[i - 1].id)?.status === 'abgeschlossen'
     const frei = kurs.strenge === 'frei' || erledigt || vorherErledigt
 
@@ -151,9 +157,16 @@ function kursDetail(user, kurs, pflicht) {
       frei,
       prozent: p?.prozent ?? 0,
       max_position_sek: p?.max_position_sek ?? 0,
+      kapitel: l.kapitel || '',
+      unterkapitel: l.unterkapitel || null,
+      sichtbar: l.sichtbar !== 0,
       video_datei: l.video_datei,
       video_vorhanden: !!(l.video_datei && existsSync(join(MEDIA_DIR, l.video_datei))),
       video_laenge_sek: l.video_laenge_sek,
+      audio_datei: l.audio_datei,
+      audio_vorhanden: !!(l.audio_datei && existsSync(join(MEDIA_DIR, l.audio_datei))),
+      youtube_id: l.youtube_id,
+      scorm_paket: l.scorm_paket,
       text_inhalt: l.text_inhalt,
       pdf_datei: l.pdf_datei,
       pdf_vorhanden: !!(l.pdf_datei && existsSync(join(MEDIA_DIR, l.pdf_datei))),
@@ -182,14 +195,14 @@ function kursDetail(user, kurs, pflicht) {
 
   return {
     ...kursKarte(user, kurs, pflicht, repo.gespeicherteKurse(user.id)),
-    // Seeking is blocked on the first run of strict courses, allowed on refreshers.
+    // Beim Erstdurchlauf strenger Kurse ist Vorspulen gesperrt, bei Wiederholungen nicht.
     vorspulen_erlaubt: kurs.strenge === 'frei' || st.wiederholung,
     lektionen,
     aktive_lektion: ersteOffene === null ? 0 : ersteOffene,
   }
 }
 
-/* ------------------------------------------------------------------- Routes */
+/* ------------------------------------------------------------------- Routen */
 
 const routes = []
 const route = (method, pfad, handler, { oeffentlich = false, rollen = null } = {}) =>
@@ -222,10 +235,10 @@ export function findRoute(method, pfad) {
   return null
 }
 
-/* ------------------------------------------------------------------- Access */
+/* ------------------------------------------------------------------- Zugang */
 
-// Platform name, organisation and support address. Needed before sign-in (login
-// screen), so this endpoint deliberately exposes nothing internal.
+// Name der Plattform, Organisation und Support-Adresse - schon vor der Anmeldung
+// gebraucht (Login), enthält deshalb bewusst nichts Internes.
 route('GET', '/api/info', () => oeffentlicheKonfiguration(), { oeffentlich: true })
 
 route(
@@ -273,12 +286,13 @@ route('POST', '/api/passwort', ({ user, body }) => {
   return { ok: true }
 })
 
-/* ------------------------------------------------------------------ Library */
+/* --------------------------------------------------------------- Bibliothek */
 
 route('GET', '/api/bibliothek', ({ user }) => ({ user: oeffentlicherUser(user), ...bibliothek(user) }))
 
 route('GET', '/api/kurse/:slug', ({ user, params }) => {
-  const kurs = repo.kursBySlug(params.slug)
+  // Der Admin darf Entwürfe zur Kontrolle öffnen, alle anderen nicht
+  const kurs = repo.kursBySlug(params.slug, user.rolle === 'admin')
   if (!kurs) throw new HttpError(404, 'Diese Schulung gibt es nicht.')
   const zuweisungen = repo.zuweisungenFuer(user)
   if (!zuweisungen.has(kurs.id)) throw new HttpError(403, 'Diese Schulung ist dir nicht zugewiesen.')
@@ -299,7 +313,7 @@ route('POST', '/api/kurse/:slug/speichern', ({ user, params }) => {
   return { gespeichert }
 })
 
-/* ------------------------------------------------------------ Lesson runner */
+/* ------------------------------------------------------------- Lektionslauf */
 
 function lektionKontext(user, lessonId) {
   const l = repo.lektion(Number(lessonId))
@@ -309,6 +323,22 @@ function lektionKontext(user, lessonId) {
   if (!zuweisungen.has(kurs.id)) throw new HttpError(403, 'Diese Schulung ist dir nicht zugewiesen.')
   return { lektion: l, kurs, pflicht: zuweisungen.get(kurs.id).pflicht }
 }
+
+/**
+ * Kurzlebiges Token für die geschützte Videoauslieferung. Der Player holt es
+ * sich unmittelbar vor der Wiedergabe; eine kopierte Stream-URL ist damit nach
+ * eineinhalb Minuten wertlos und in einer fremden Session sofort.
+ */
+route('GET', '/api/lektionen/:id/stream-token', ({ user, params }) => {
+  const { lektion } = lektionKontext(user, params.id)
+  if (!['video', 'audio'].includes(lektion.typ)) throw new HttpError(400, 'Diese Lektion hat kein Medium.')
+  const datei = lektion.typ === 'video' ? lektion.video_datei : lektion.audio_datei
+  if (!datei) throw new HttpError(404, 'Für diese Lektion ist keine Datei hinterlegt.')
+  return {
+    url: `/api/stream/${lektion.id}?t=${streamTokenErzeugen(user.id, lektion.id)}`,
+    gueltig_sek: 90,
+  }
+})
 
 route('POST', '/api/lektionen/:id/fortschritt', ({ user, params, body }) => {
   const { lektion, kurs } = lektionKontext(user, params.id)
@@ -320,10 +350,10 @@ route('POST', '/api/lektionen/:id/fortschritt', ({ user, params, body }) => {
 route('POST', '/api/lektionen/:id/abschliessen', ({ user, params, body }) => {
   const { lektion, kurs, pflicht } = lektionKontext(user, params.id)
 
-  if (lektion.typ === 'video' && kurs.strenge === 'streng') {
+  if (['video', 'youtube'].includes(lektion.typ) && kurs.strenge === 'streng') {
     const p = db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(user.id, lektion.id)
     const st = repo.kursStatus(user, kurs, pflicht)
-    // The 95 percent rule applies only to the first run of strict courses
+    // 95-Prozent-Regel gilt nur beim Erstdurchlauf strenger Kurse
     if (!st.wiederholung && (p?.prozent ?? 0) < 95)
       throw new HttpError(400, 'Das Video muss zu mindestens 95 % angesehen sein.')
   }
@@ -367,7 +397,7 @@ route('POST', '/api/lektionen/:id/extern', ({ user, params, body }) => {
   return { ok: true, kurs_abgeschlossen: !!abschluss, zertifikat_id: abschluss?.id ?? null }
 })
 
-/* ------------------------------------------------------------------ Quizzes */
+/* -------------------------------------------------------------------- Quizze */
 
 route('POST', '/api/lektionen/:id/quiz/start', ({ user, params }) => {
   const { lektion, kurs, pflicht } = lektionKontext(user, params.id)
@@ -457,7 +487,7 @@ route('POST', '/api/versuche/:id/abgeben', ({ user, params, body }) => {
   }
 })
 
-/* ------------------------------------------------------------------ Profile */
+/* ------------------------------------------------------------------- Profil */
 
 route('GET', '/api/profil', ({ user }) => {
   const lib = bibliothek(user)
@@ -498,7 +528,46 @@ route('GET', '/api/profil', ({ user }) => {
   }
 })
 
-/* ------------------------------------------ Department overview (read-only) */
+/* ---------------------------------------------------------------- Rangliste */
+
+// Sichtbar für alle: Level, Anzahl Schulungen und wann zuletzt etwas
+// abgeschlossen wurde. Bewusst OHNE Quizergebnisse und ohne Angabe, welche
+// Pflichtschulung jemandem fehlt - eine Rangliste darf nicht zum Pranger werden.
+route('GET', '/api/rangliste', ({ user }) => {
+  const zeilen = repo
+    .alleUser()
+    .filter((p) => p.rolle !== 'admin' || p.id === user.id)
+    .map((p) => {
+      const anzahl = repo.abschlussAnzahl(p.id)
+      const letzter = repo.letzterAbschlussGesamt(p.id)
+      return {
+        id: p.id,
+        name: p.name,
+        abteilung: p.abteilung,
+        standort: p.standort,
+        initialen: p.name.split(/\s+/).map((t) => t[0]).join('').slice(0, 2).toUpperCase(),
+        level: levelBerechnen(anzahl),
+        letzter_abschluss: letzter?.abgeschlossen_am ?? null,
+        letzte_schulung: letzter?.titel ?? null,
+        ich: p.id === user.id,
+      }
+    })
+    .sort(
+      (a, b) =>
+        b.level.abschluesse - a.level.abschluesse ||
+        String(b.letzter_abschluss).localeCompare(String(a.letzter_abschluss)) ||
+        a.name.localeCompare(b.name),
+    )
+    .map((z, i) => ({ ...z, platz: i + 1 }))
+
+  return {
+    zeilen,
+    eigener_platz: zeilen.find((z) => z.ich)?.platz ?? null,
+    teilnehmer: zeilen.length,
+  }
+})
+
+/* ------------------------------------------------- Bereichsübersicht (lesend) */
 
 route(
   'GET',
@@ -519,7 +588,7 @@ route(
         abteilung: p.abteilung,
         eintrittsdatum: p.eintrittsdatum,
         pflicht_gesamt: stati.length,
-        // Status only, never scores - individual scores are for the admin alone.
+        // Bewusst nur Status, keine Punktzahlen - die sieht ausschließlich der Admin.
         erfuellt: stati.filter((s) => s.status === 'bestanden').length,
         bald_faellig: stati.filter((s) => s.status === 'bald_faellig').length,
         ueberfaellig: stati.filter((s) => s.status === 'ueberfaellig').length,
@@ -539,7 +608,7 @@ route(
   { rollen: ['admin', 'fuehrungskraft'] },
 )
 
-/* ------------------------------------------------------------- Certificates */
+/* --------------------------------------------------------------- Zertifikate */
 
 route('GET', '/api/nachweise/:id/pdf', async ({ user, params }) => {
   const abschluss = repo.abschlussById(Number(params.id))
@@ -558,7 +627,7 @@ route('GET', '/api/nachweise/:id/pdf', async ({ user, params }) => {
   }
 })
 
-/* --------------------------------------------------------- Admin utilities */
+/* ------------------------------------------------------ Admin-Hilfsfunktionen */
 
 route(
   'GET',
@@ -600,12 +669,253 @@ route(
           'content-type': 'text/csv; charset=utf-8',
           'content-disposition': `attachment; filename="Qualifikationsmatrix-${nowIso().slice(0, 10)}.csv"`,
         },
-        // BOM so that Excel reads the umlauts correctly
+        // BOM, damit Excel die Umlaute richtig liest
         body: Buffer.from('﻿' + zeilen.join('\r\n'), 'utf8'),
       },
     }
   },
   { rollen: ['admin'] },
 )
+
+/* ==========================================================================
+   Verwaltung (Rolle admin)
+   ========================================================================== */
+
+const nurAdmin = { rollen: ['admin'] }
+
+route('GET', '/api/admin/kurse', () => ({ kurse: admin.kurseFuerVerwaltung() }), nurAdmin)
+
+route('POST', '/api/admin/kurse', ({ user, body }) => {
+  const slug = admin.kursAnlegen(body ?? {})
+  repo.audit(user.id, 'admin.kurs.angelegt', slug)
+  return { slug }
+}, nurAdmin)
+
+route('GET', '/api/admin/kurse/:slug', ({ params }) => {
+  const kurs = admin.kursFuerVerwaltung(params.slug)
+  if (!kurs) throw new HttpError(404, 'Kurs nicht gefunden.')
+  return kurs
+}, nurAdmin)
+
+route('PUT', '/api/admin/kurse/:slug', ({ user, params, body }) => {
+  const kurs = admin.kursSpeichern(params.slug, body ?? {})
+  if (!kurs) throw new HttpError(404, 'Kurs nicht gefunden.')
+  repo.audit(user.id, 'admin.kurs.geaendert', params.slug)
+  return kurs
+}, nurAdmin)
+
+route('DELETE', '/api/admin/kurse/:slug', ({ user, params }) => {
+  if (!admin.kursLoeschen(params.slug)) throw new HttpError(404, 'Kurs nicht gefunden.')
+  repo.audit(user.id, 'admin.kurs.geloescht', params.slug)
+  return { ok: true }
+}, nurAdmin)
+
+route('POST', '/api/admin/kurse/:slug/klonen', ({ user, params }) => {
+  const slug = admin.kursKlonen(params.slug)
+  if (!slug) throw new HttpError(404, 'Kurs nicht gefunden.')
+  repo.audit(user.id, 'admin.kurs.geklont', slug)
+  return { slug }
+}, nurAdmin)
+
+route('PUT', '/api/admin/kurse/:slug/lektionen', ({ user, params, body }) => {
+  const kurs = admin.lektionenSpeichern(params.slug, body?.lektionen ?? [])
+  if (!kurs) throw new HttpError(404, 'Kurs nicht gefunden.')
+  repo.audit(user.id, 'admin.lektionen.geaendert', params.slug, { anzahl: body?.lektionen?.length })
+  return kurs
+}, nurAdmin)
+
+route('POST', '/api/admin/medien', ({ user, body }) => {
+  try {
+    const ergebnis = admin.medienUpload(body ?? {})
+    repo.audit(user.id, 'admin.medien.hochgeladen', ergebnis.pfad, { groesse: ergebnis.groesse })
+    return ergebnis
+  } catch (f) {
+    throw new HttpError(400, f.message)
+  }
+}, nurAdmin)
+
+route('GET', '/api/admin/personen', ({ url }) => ({
+  personen: admin.personenListe(Object.fromEntries(url.searchParams)),
+  standorte: [...new Set(repo.alleUser().map((p) => p.standort))].sort(),
+  abteilungen: [...new Set(repo.alleUser().map((p) => p.abteilung))].sort(),
+}), nurAdmin)
+
+route('POST', '/api/admin/personen', ({ user, body }) => {
+  try {
+    const ergebnis = admin.personAnlegen(body ?? {})
+    repo.audit(user.id, 'admin.person.angelegt', ergebnis.id)
+    return ergebnis
+  } catch (f) {
+    throw new HttpError(400, f.message)
+  }
+}, nurAdmin)
+
+route('GET', '/api/admin/personen/:id', ({ params }) => {
+  const detail = admin.personDetail(params.id)
+  if (!detail) throw new HttpError(404, 'Person nicht gefunden.')
+  return detail
+}, nurAdmin)
+
+route('PUT', '/api/admin/personen/:id', ({ user, params, body }) => {
+  const detail = admin.personSpeichern(params.id, body ?? {})
+  if (!detail) throw new HttpError(404, 'Person nicht gefunden.')
+  repo.audit(user.id, 'admin.person.geaendert', params.id)
+  return detail
+}, nurAdmin)
+
+route('POST', '/api/admin/personen/:id/passwort-reset', ({ user, params }) => {
+  const ergebnis = admin.passwortZuruecksetzen(params.id)
+  if (!ergebnis) throw new HttpError(404, 'Person nicht gefunden.')
+  repo.audit(user.id, 'admin.passwort.zurueckgesetzt', params.id)
+  return ergebnis
+}, nurAdmin)
+
+route('POST', '/api/admin/personen/import', ({ user, body }) => {
+  try {
+    const ergebnis = admin.csvImport(body?.csv ?? '')
+    repo.audit(user.id, 'admin.csv.import', null, { angelegt: ergebnis.angelegt.length })
+    return ergebnis
+  } catch (f) {
+    throw new HttpError(400, f.message)
+  }
+}, nurAdmin)
+
+/* ==========================================================================
+   Performance: Ziele, Reviews, Kompetenzen, Stimmungsbild
+   ========================================================================== */
+
+const fuehrung = { rollen: ['admin', 'fuehrungskraft'] }
+
+/** Darf `user` die Performance-Daten von `zielId` sehen bzw. ändern? */
+function performanceZugriff(user, zielUserId, schreibend = false) {
+  if (user.rolle === 'admin') return true
+  if (user.id === zielUserId) return !schreibend // eigene Daten: lesen ja, setzen nein
+  if (user.rolle === 'fuehrungskraft') {
+    const ziel = repo.userById(zielUserId)
+    return !!ziel && ziel.standort === user.standort
+  }
+  return false
+}
+
+route('GET', '/api/performance/ich', ({ user }) => ({
+  ziele: performance.zieleFuer(user.id),
+  zielerreichung: performance.zielerreichung(user.id),
+  reviews: performance.reviewsFuer(user.id),
+  kompetenzen: performance.kompetenzProfil(user.id),
+  umfrage: { fragen: performance.FRAGEN, antworten: performance.umfrageAntworten(user.id, aktuelleRunde()) },
+  runde: aktuelleRunde(),
+}))
+
+/** Quartalsrunde, z.B. "2026-Q3" - hält das Stimmungsbild vergleichbar. */
+function aktuelleRunde() {
+  const d = new Date()
+  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`
+}
+
+route('PUT', '/api/performance/umfrage', ({ user, body }) => ({
+  antworten: performance.umfrageSpeichern(user.id, aktuelleRunde(), body?.antworten ?? {}),
+}))
+
+route('GET', '/api/performance/person/:id', ({ user, params }) => {
+  if (!performanceZugriff(user, params.id)) throw new HttpError(403, 'Kein Zugriff auf diese Person.')
+  const person = repo.userById(params.id)
+  if (!person) throw new HttpError(404, 'Person nicht gefunden.')
+  return {
+    person: { id: person.id, name: person.name, abteilung: person.abteilung, standort: person.standort },
+    ziele: performance.zieleFuer(person.id),
+    zielerreichung: performance.zielerreichung(person.id),
+    reviews: performance.reviewsFuer(person.id),
+    kompetenzen: performance.kompetenzProfil(person.id),
+  }
+})
+
+route('GET', '/api/performance/uebersicht', ({ user }) => performance.uebersicht(user), fuehrung)
+
+route('GET', '/api/performance/heatmap', ({ user }) => performance.heatmap(aktuelleRunde()), fuehrung)
+
+route('GET', '/api/performance/kompetenzen', () => ({ kompetenzen: performance.kompetenzen() }), fuehrung)
+
+route(
+  'POST',
+  '/api/performance/ziele',
+  ({ user, body }) => {
+    if (!performanceZugriff(user, body?.user_id, true)) throw new HttpError(403, 'Kein Zugriff auf diese Person.')
+    if (!body?.titel || !body?.faellig_am) throw new HttpError(400, 'Titel und Frist sind erforderlich.')
+    const id = performance.zielAnlegen(body, user.id)
+    repo.audit(user.id, 'ziel.angelegt', String(id), { fuer: body.user_id })
+    return { id, ziele: performance.zieleFuer(body.user_id) }
+  },
+  fuehrung,
+)
+
+route('PUT', '/api/performance/ziele/:id', ({ user, params, body }) => {
+  const ziel = db.prepare('SELECT * FROM goals WHERE id = ?').get(Number(params.id))
+  if (!ziel) throw new HttpError(404, 'Ziel nicht gefunden.')
+  // Den Istwert darf die Person selbst pflegen, alles andere nur die Führung
+  const nurIstwert = Object.keys(body ?? {}).every((k) => ['istwert', 'kommentar'].includes(k))
+  const erlaubt = nurIstwert ? user.id === ziel.user_id || performanceZugriff(user, ziel.user_id, true) : performanceZugriff(user, ziel.user_id, true)
+  if (!erlaubt) throw new HttpError(403, 'Kein Zugriff auf dieses Ziel.')
+
+  const neu = performance.zielAktualisieren(Number(params.id), body ?? {}, user.id)
+  repo.audit(user.id, 'ziel.geaendert', params.id)
+  return { ziel: neu, verlauf: performance.zielVerlauf(Number(params.id)) }
+})
+
+route(
+  'DELETE',
+  '/api/performance/ziele/:id',
+  ({ user, params }) => {
+    const ziel = db.prepare('SELECT * FROM goals WHERE id = ?').get(Number(params.id))
+    if (!ziel) throw new HttpError(404, 'Ziel nicht gefunden.')
+    if (!performanceZugriff(user, ziel.user_id, true)) throw new HttpError(403, 'Kein Zugriff auf dieses Ziel.')
+    performance.zielLoeschen(Number(params.id))
+    repo.audit(user.id, 'ziel.geloescht', params.id)
+    return { ok: true }
+  },
+  fuehrung,
+)
+
+route(
+  'POST',
+  '/api/performance/reviews',
+  ({ user, body }) => {
+    if (!performanceZugriff(user, body?.user_id, true)) throw new HttpError(403, 'Kein Zugriff auf diese Person.')
+    const id = performance.reviewAnlegen({ ...body, fuehrungskraft: body.fuehrungskraft ?? user.name })
+    repo.audit(user.id, 'review.angelegt', String(id), { fuer: body.user_id })
+    return { id }
+  },
+  fuehrung,
+)
+
+route('PUT', '/api/performance/reviews/:id', ({ user, params, body }) => {
+  const review = db.prepare('SELECT * FROM reviews WHERE id = ?').get(Number(params.id))
+  if (!review) throw new HttpError(404, 'Review nicht gefunden.')
+  // Die eigene Selbsteinschätzung darf man schreiben, die Bewertung nicht
+  const nurSelbst = Object.keys(body ?? {}).every((k) => ['selbst_text', 'status'].includes(k)) && body.status !== 'abgeschlossen'
+  const erlaubt = nurSelbst ? user.id === review.user_id || performanceZugriff(user, review.user_id, true) : performanceZugriff(user, review.user_id, true)
+  if (!erlaubt) throw new HttpError(403, 'Kein Zugriff auf dieses Review.')
+
+  const neu = performance.reviewSpeichern(Number(params.id), body ?? {})
+  repo.audit(user.id, 'review.geaendert', params.id, { status: neu.status })
+  return neu
+})
+
+route(
+  'POST',
+  '/api/performance/kompetenzen/bewerten',
+  ({ user, body }) => {
+    if (!performanceZugriff(user, body?.user_id, true)) throw new HttpError(403, 'Kein Zugriff auf diese Person.')
+    const profil = performance.kompetenzBewerten(body)
+    repo.audit(user.id, 'kompetenz.bewertet', String(body.competency_id), { fuer: body.user_id })
+    return { kompetenzen: profil }
+  },
+  fuehrung,
+)
+
+/* ------------------------------------------------------- Benachrichtigungen */
+
+route('GET', '/api/benachrichtigungen', ({ user }) => admin.benachrichtigungenLesen(user.id))
+
+route('PUT', '/api/benachrichtigungen', ({ user, body }) => admin.benachrichtigungenSpeichern(user.id, body ?? {}))
 
 export { routes }

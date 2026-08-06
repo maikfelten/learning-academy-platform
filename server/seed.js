@@ -1863,6 +1863,194 @@ function demoVerlauf() {
   }
 }
 
+/* -------------------------------------------- Performance: Beispieldaten */
+
+const KOMPETENZEN = [
+  ['Fachliche Ausführung', 'Handwerk', 'Arbeitet normgerecht, sauber und reproduzierbar'],
+  ['Qualitätsbewusstsein', 'Handwerk', 'Erkennt Abweichungen früh und meldet sie'],
+  ['Arbeitssicherheit', 'Handwerk', 'Hält Vorgaben auch unter Zeitdruck ein'],
+  ['Dokumentation', 'Prozess', 'Führt Nachweise vollständig und nachvollziehbar'],
+  ['Selbstständigkeit', 'Prozess', 'Trifft im eigenen Rahmen tragfähige Entscheidungen'],
+  ['Zusammenarbeit', 'Verhalten', 'Teilt Wissen, hilft aus, nimmt Kritik an'],
+  ['Kundenumgang', 'Verhalten', 'Tritt beim Kunden sicher und verbindlich auf'],
+  ['Digitale Werkzeuge', 'Zukunft', 'Nutzt die freigegebenen Systeme sicher'],
+]
+
+/**
+ * Legt Kompetenzen, Ziele, Reviews und ein Stimmungsbild an.
+ * Die Werte sind so gestreut, dass Heatmap und Netzdiagramm etwas zeigen -
+ * inklusive der unangenehmen Erkenntnis, dass die Leistungsträger unzufriedener
+ * sind als der Durchschnitt. Genau dafür ist die Auswertung da.
+ */
+function performanceDemo() {
+  KOMPETENZEN.forEach(([name, kategorie, beschreibung], i) => {
+    db.prepare('INSERT INTO competencies (name, beschreibung, kategorie, sortierung) VALUES (?,?,?,?)').run(
+      name,
+      beschreibung,
+      kategorie,
+      i,
+    )
+  })
+  const komp = db.prepare('SELECT * FROM competencies ORDER BY sortierung').all()
+
+  const ziel = (email, titel, opt = {}) => {
+    const uid = userId(email)
+    if (!uid) return
+    db.prepare(
+      `INSERT INTO goals (user_id, titel, beschreibung, art, einheit, startwert, zielwert, istwert,
+                          faellig_am, gewichtung, course_id, status, erstellt_von, erstellt_am, abgeschlossen_am)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      uid,
+      titel,
+      opt.beschreibung ?? null,
+      opt.art ?? 'messbar',
+      opt.einheit ?? null,
+      opt.startwert ?? 0,
+      opt.zielwert ?? 100,
+      opt.istwert ?? 0,
+      opt.faellig_am ?? addDays(JETZT, 90),
+      opt.gewichtung ?? 1,
+      opt.course_id ?? null,
+      opt.status ?? 'laufend',
+      userId('admin@example.com'),
+      JETZT,
+      opt.status === 'erreicht' ? (opt.abgeschlossen_am ?? opt.faellig_am ?? JETZT) : null,
+    )
+  }
+
+  const kursId2 = (slug) => kursId(slug)?.id ?? null
+
+  // Admin: gemischtes Bild für die Vorführung
+  ziel('admin@example.com', 'Alle Pflichtschulungen aktuell halten', {
+    beschreibung: 'Kein Nachweis läuft ab, ohne dass die Wiederholung terminiert ist.',
+    art: 'binaer', istwert: 0, faellig_am: addDays(JETZT, 21), gewichtung: 3,
+  })
+  ziel('admin@example.com', 'KI-Grundlagen abschließen', {
+    beschreibung: 'Verknüpft mit der Schulung - der Fortschritt zählt automatisch.',
+    course_id: kursId2('ki-im-arbeitsalltag'), faellig_am: addDays(JETZT, 45), gewichtung: 2,
+  })
+  ziel('admin@example.com', 'Schulungsplattform bei der GF vorstellen', {
+    art: 'binaer', istwert: 1, status: 'erreicht', faellig_am: addDays(JETZT, -10), gewichtung: 2,
+  })
+
+  ziel('tobias.krayer@example.com', 'Onboarding vollständig abschließen', {
+    beschreibung: 'Alle Pflichtschulungen innerhalb der Frist.',
+    einheit: 'Schulungen', startwert: 0, zielwert: 7, istwert: 1,
+    faellig_am: addDays(JETZT, 14), gewichtung: 3,
+  })
+  ziel('tobias.krayer@example.com', 'Selbstständig an Baugruppe B arbeiten', {
+    art: 'binaer', istwert: 0, faellig_am: addDays(JETZT, 120),
+  })
+
+  ziel('miriam.sander@example.com', 'Prüfmittelüberwachung digitalisieren', {
+    einheit: '% erfasst', zielwert: 100, istwert: 72, faellig_am: addDays(JETZT, 60), gewichtung: 2,
+  })
+  ziel('miriam.sander@example.com', 'Zwei Kollegen in Messtechnik einarbeiten', {
+    einheit: 'Personen', zielwert: 2, istwert: 2, status: 'erreicht', faellig_am: addDays(JETZT, -20),
+  })
+
+  ziel('jens.ohlendorf@example.com', 'Überfällige Unterweisungen nachholen', {
+    einheit: 'Schulungen', zielwert: 2, istwert: 0, faellig_am: addDays(JETZT, -5), gewichtung: 3,
+  })
+  ziel('aylin.deveci@example.com', 'Auftragsdurchlauf um zwei Tage verkürzen', {
+    einheit: 'Tage', startwert: 9, zielwert: 7, istwert: 8, faellig_am: addDays(JETZT, 75), gewichtung: 2,
+  })
+  ziel('dennis.huebner@example.com', 'Zeichnungsnormen auf aktuellen Stand bringen', {
+    einheit: '% geprüft', zielwert: 100, istwert: 40, faellig_am: addDays(JETZT, 30), gewichtung: 2,
+  })
+  ziel('kerstin.maas@example.com', 'Rüstzeiten dokumentieren', {
+    einheit: '% erfasst', zielwert: 100, istwert: 95, faellig_am: addDays(JETZT, 40),
+  })
+
+  // Reviews: abgeschlossene Runde mit gestreuten Bewertungen
+  const review = (email, bewertung, staerken, entwicklung) => {
+    const uid = userId(email)
+    if (!uid) return
+    const info = db
+      .prepare(
+        `INSERT INTO reviews (user_id, zeitraum, status, bewertung, zielerreichung, staerken, entwicklung,
+                              gespraech_am, fuehrungskraft, erstellt_am, abgeschlossen_am)
+         VALUES (?,?, 'abgeschlossen', ?,?,?,?,?,?,?,?)`,
+      )
+      .run(uid, '2026 H1', bewertung, null, staerken, entwicklung, heuteMinus(40), 'Lena Brandt', heuteMinus(50), heuteMinus(40))
+    return Number(info.lastInsertRowid)
+  }
+
+  const reviews = {
+    'miriam.sander@example.com': review('miriam.sander@example.com', 5, 'Sehr genau, denkt Prozesse zu Ende.', 'Mehr Wissen aktiv weitergeben.'),
+    'kerstin.maas@example.com': review('kerstin.maas@example.com', 4, 'Zuverlässig, gute Planung.', 'Digitale Werkzeuge stärker nutzen.'),
+    'dennis.huebner@example.com': review('dennis.huebner@example.com', 4, 'Saubere Zeichnungen.', 'Normenkenntnis vertiefen.'),
+    'aylin.deveci@example.com': review('aylin.deveci@example.com', 3, 'Behält den Überblick.', 'Rückfragen früher stellen.'),
+    'tobias.krayer@example.com': review('tobias.krayer@example.com', 3, 'Lernt schnell.', 'Noch Sicherheit in der Ausführung gewinnen.'),
+    'jens.ohlendorf@example.com': review('jens.ohlendorf@example.com', 2, 'Große Erfahrung am Bauteil.', 'Nachweise und Fristen konsequent führen.'),
+    'admin@example.com': review('admin@example.com', 4, 'Treibt Digitalisierung voran.', 'Themen früher abstimmen.'),
+  }
+
+  // Kompetenzbewertungen: Ist und Soll je Person
+  const profile = {
+    'miriam.sander@example.com': [4, 4, 4, 4, 3, 3, 3, 2],
+    'kerstin.maas@example.com': [3, 3, 3, 4, 3, 3, 2, 2],
+    'dennis.huebner@example.com': [4, 3, 2, 3, 3, 3, 2, 3],
+    'aylin.deveci@example.com': [2, 3, 2, 4, 3, 4, 3, 3],
+    'tobias.krayer@example.com': [2, 2, 2, 2, 2, 3, 2, 3],
+    'jens.ohlendorf@example.com': [4, 3, 2, 1, 3, 2, 2, 1],
+    'lena.brandt@example.com': [3, 4, 4, 3, 4, 4, 4, 3],
+    'sofia.reinke@example.com': [4, 4, 4, 4, 4, 4, 3, 3],
+    'admin@example.com': [2, 3, 3, 4, 4, 4, 3, 4],
+  }
+  const soll = [3, 4, 4, 3, 3, 3, 3, 3]
+
+  for (const [email, stufen] of Object.entries(profile)) {
+    const uid = userId(email)
+    if (!uid) continue
+    stufen.forEach((stufe, i) => {
+      db.prepare(
+        `INSERT INTO competency_ratings (user_id, competency_id, review_id, stufe, soll_stufe, quelle, erstellt_am)
+         VALUES (?,?,?,?,?,'fuehrungskraft',?)`,
+      ).run(uid, komp[i].id, reviews[email] ?? null, stufe, soll[i], heuteMinus(40))
+      // Selbsteinschätzung leicht abweichend - das macht das Netzdiagramm interessant
+      db.prepare(
+        `INSERT INTO competency_ratings (user_id, competency_id, stufe, soll_stufe, quelle, erstellt_am)
+         VALUES (?,?,?,?, 'selbst',?)`,
+      ).run(uid, komp[i].id, Math.min(4, stufe + (i % 3 === 0 ? 1 : 0)), soll[i], heuteMinus(42))
+    })
+  }
+
+  // Stimmungsbild der laufenden Runde
+  const d = new Date(JETZT)
+  const runde = `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`
+  const FRAGEN = [
+    'Ich weiß, was von mir erwartet wird.',
+    'Ich bekomme regelmäßig hilfreiche Rückmeldung.',
+    'Ich kann mich hier fachlich weiterentwickeln.',
+    'Ich habe die Mittel, meine Arbeit gut zu machen.',
+    'Ich würde dieses Unternehmen als Arbeitgeber weiterempfehlen.',
+  ]
+  // Leistungsträger antworten bewusst schlechter bei Rückmeldung und Entwicklung
+  const antworten = {
+    'miriam.sander@example.com': [4, 2, 2, 4, 3],
+    'kerstin.maas@example.com': [4, 3, 3, 4, 4],
+    'dennis.huebner@example.com': [4, 2, 3, 3, 4],
+    'aylin.deveci@example.com': [4, 4, 4, 4, 4],
+    'tobias.krayer@example.com': [3, 4, 5, 4, 5],
+    'jens.ohlendorf@example.com': [3, 3, 2, 3, 3],
+    'lena.brandt@example.com': [5, 4, 4, 4, 4],
+    'sofia.reinke@example.com': [4, 3, 3, 4, 4],
+    'pawel.nowak@example.com': [3, 4, 4, 3, 4],
+    'admin@example.com': [4, 3, 4, 3, 4],
+  }
+  for (const [email, werte] of Object.entries(antworten)) {
+    const uid = userId(email)
+    if (!uid) continue
+    werte.forEach((wert, i) => {
+      db.prepare('INSERT INTO survey_answers (user_id, runde, frage, wert, erstellt_am) VALUES (?,?,?,?,?)').run(
+        uid, runde, FRAGEN[i], wert, heuteMinus(7),
+      )
+    })
+  }
+}
+
 /* -------------------------------------------------------------- Entry point */
 
 export async function seed({ force = false } = {}) {
@@ -1871,6 +2059,14 @@ export async function seed({ force = false } = {}) {
 
   if (force) {
     for (const t of [
+      'survey_answers',
+      'competency_ratings',
+      'reviews',
+      'goal_updates',
+      'goals',
+      'competencies',
+      'notifications',
+      'notification_settings',
       'audit_log',
       'external_proofs',
       'saved_courses',
@@ -1930,6 +2126,7 @@ export async function seed({ force = false } = {}) {
   }
 
   demoVerlauf()
+  performanceDemo()
   await demoPdfsSchreiben()
 
   console.log(

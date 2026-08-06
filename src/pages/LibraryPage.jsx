@@ -26,14 +26,16 @@ function Hero({ kurse, index, setIndex, onOeffnen, onSpeichern }) {
 
   return (
     <section
-      className="relative overflow-hidden rounded-3xl"
+      /* medien: dunkle Fläche in beiden Themes - schaltet die Textstufen im
+         Teilbaum auf hell, sonst stünde im hellen Theme Dunkel auf Dunkel */
+      className="medien relative overflow-hidden rounded-3xl"
       style={{
         background: `radial-gradient(120% 120% at 12% 0%, color-mix(in srgb, ${farbe} 22%, #2b2d2d) 0%, #232525 45%, #141515 100%)`,
-        border: '1px solid var(--border-soft)',
+        border: '1px solid rgba(255,255,255,0.10)',
       }}
     >
       <img
-        src="/brand/mark.svg"
+        src="/brand/bildmarke-weiss.svg"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute -bottom-[30%] right-[-6%] w-[62%] opacity-[0.05]"
@@ -42,18 +44,25 @@ function Hero({ kurse, index, setIndex, onOeffnen, onSpeichern }) {
       <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:gap-10 lg:p-10">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="chip" style={{ color: farbe, borderColor: `color-mix(in srgb, ${farbe} 40%, transparent)` }}>
+            <span
+              className="chip"
+              style={{ color: 'var(--color-akzent-text)', borderColor: 'color-mix(in srgb, var(--color-akzent-text) 45%, transparent)' }}
+            >
               <Sparkles size={11} />
               Empfehlung
             </span>
             <span className="chip">{kurs.kategorie}</span>
-            {kurs.demo && <span className="chip" style={{ color: '#FFC53A' }}>Beispielinhalt</span>}
+            {kurs.demo && (
+              <span className="chip" style={{ color: 'var(--status-soon-text)' }}>
+                Demo-Inhalt
+              </span>
+            )}
           </div>
 
           <h1 className="mt-4 max-w-[22ch] text-3xl font-medium leading-[1.1] tracking-tight sm:text-4xl">
             {kurs.titel}
           </h1>
-          <p className="mt-1.5 text-sm font-medium" style={{ color: farbe }}>
+          <p className="mt-1.5 text-sm font-medium" style={{ color: 'var(--color-akzent-text)' }}>
             {kurs.untertitel}
           </p>
           <p className="mt-4 max-w-[58ch] text-[13.5px] leading-relaxed text-muted">{kurs.beschreibung}</p>
@@ -81,7 +90,7 @@ function Hero({ kurse, index, setIndex, onOeffnen, onSpeichern }) {
           )}
         </div>
 
-        {/* Cover, standing like a book on a shelf */}
+        {/* Cover, wie ein aufgestelltes Buch */}
         <div className="relative hidden shrink-0 lg:block">
           <div
             className="rotate-[3deg] transition duration-500 hover:rotate-0"
@@ -114,7 +123,7 @@ function Hero({ kurse, index, setIndex, onOeffnen, onSpeichern }) {
   )
 }
 
-/* ------------------------------------------------------------ Left column */
+/* ---------------------------------------------------------- Linke Spalte */
 
 function SeitenListe({ titel, kurse, onOeffnen, leerText, mitFortschritt = false }) {
   return (
@@ -133,7 +142,7 @@ function SeitenListe({ titel, kurse, onOeffnen, leerText, mitFortschritt = false
           <button
             key={k.slug}
             onClick={() => onOeffnen(k.slug)}
-            className="flex w-full items-center gap-2.5 rounded-xl p-1.5 text-left transition hover:bg-white/5"
+            className="flex w-full items-center gap-2.5 rounded-xl p-1.5 text-left transition hover:bg-[var(--surface-hover)]"
           >
             <CourseCover kurs={k} groesse="sm" className="h-[44px] w-[32px] shrink-0 rounded-md" />
             <span className="min-w-0 flex-1">
@@ -161,7 +170,7 @@ function SeitenListe({ titel, kurse, onOeffnen, leerText, mitFortschritt = false
   )
 }
 
-/* -------------------------------------------------------------- Tile row */
+/* ---------------------------------------------------------- Kachelreihe */
 
 function Reihe({ titel, hinweis, kurse, onOeffnen, onSpeichern, alleAnzeigen }) {
   if (!kurse.length) return null
@@ -172,7 +181,7 @@ function Reihe({ titel, hinweis, kurse, onOeffnen, onSpeichern, alleAnzeigen }) 
         hinweis={hinweis}
         aktion={
           alleAnzeigen && (
-            <button className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white" onClick={alleAnzeigen}>
+            <button className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-[var(--text-strong)]" onClick={alleAnzeigen}>
               Alle ansehen
               <ArrowRight size={13} />
             </button>
@@ -188,7 +197,7 @@ function Reihe({ titel, hinweis, kurse, onOeffnen, onSpeichern, alleAnzeigen }) 
   )
 }
 
-/* ------------------------------------------------------------------- Page */
+/* ------------------------------------------------------------ Hauptseite */
 
 export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern, navigate }) {
   const [heroIndex, setHeroIndex] = useState(0)
@@ -212,7 +221,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
     return daten.alle.filter((k) => k.kategorie === tab)
   }, [daten, tab])
 
-  /* ------------------------------------------------ Search / category view */
+  /* -------------------------------------------------- Such-/Kategorieansicht */
   if (suchTreffer || kategorieTreffer) {
     const liste = suchTreffer ?? kategorieTreffer
     return (
@@ -235,16 +244,16 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
     )
   }
 
-  /* ------------------------------------------------------------- Home view */
-  // Valid = passed or due soon (the certificate has not expired yet).
-  // Same definition as in the profile and in the department overview.
+  /* ------------------------------------------------------------- Startseite */
+  // Gültig = bestanden oder bald fällig (die Gültigkeit läuft noch).
+  // Gleiche Definition wie im Profil und in der Bereichsübersicht.
   const gueltig = daten.pflicht.filter((k) => k.status === 'bestanden' || k.status === 'bald_faellig')
   const offenePflicht = daten.pflicht.filter((k) => k.status !== 'bestanden' && k.status !== 'bald_faellig')
   const erfuellt = gueltig.length
 
   return (
     <div className="animate-fade flex flex-col gap-4 xl:flex-row">
-      {/* Left column */}
+      {/* Linke Spalte */}
       <aside className="order-2 w-full shrink-0 space-y-3.5 xl:order-1 xl:w-[262px]">
         <SeitenListe
           titel="Weiterlernen"
@@ -260,7 +269,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
           leerText="Noch keine neuen Schulungen."
         />
 
-        {/* Small compliance gauge - the strongest argument for the platform */}
+        {/* Kleine Erfüllungsanzeige - das Argument für die Plattform */}
         <div className="panel-flat p-3.5">
           <h2 className="mb-2.5 text-[13px] font-semibold">Deine Pflichtquote</h2>
           <div className="flex items-end gap-2">
@@ -278,7 +287,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
         </div>
       </aside>
 
-      {/* Main column */}
+      {/* Hauptspalte */}
       <div className="order-1 min-w-0 flex-1 space-y-7 xl:order-2">
         {daten.hinweise.ueberfaellig > 0 && (
           <div
@@ -300,8 +309,8 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
 
         <Hero kurse={highlights} index={heroIndex} setIndex={setHeroIndex} onOeffnen={onOeffnen} onSpeichern={onSpeichern} />
 
-        {/* Mandatory courses */}
-        <section>
+        {/* Pflichtschulungen — Sprungziel aus dem Glocken-Menü */}
+        <section id="pflichtschulungen" style={{ scrollMarginTop: '1rem' }}>
           <SectionHeader
             titel="Pflichtschulungen"
             hinweis={
@@ -310,7 +319,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
                 : `Alle ${daten.pflicht.length} Pflichtschulungen sind gültig`
             }
           />
-          {/* Order comes from the server: overdue, due soon, in progress, open, passed */}
+          {/* Reihenfolge kommt vom Server: überfällig, bald fällig, in Arbeit, offen, bestanden */}
           <div className="space-y-2">
             {daten.pflicht.map((k) => (
               <CourseRow key={k.slug} kurs={k} onOeffnen={onOeffnen} onSpeichern={onSpeichern} zeigeSpeichern={false} />
@@ -326,7 +335,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
           onSpeichern={onSpeichern}
         />
 
-        {/* Learning paths */}
+        {/* Lernpfade */}
         {daten.curricula.length > 0 && (
           <section>
             <SectionHeader titel="Lernpfade" hinweis="Mehrere Schulungen, die aufeinander aufbauen" />
@@ -336,7 +345,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
                 return (
                   <div
                     key={c.slug}
-                    className="panel-flat flex flex-col gap-3 p-4 transition hover:bg-white/[0.04]"
+                    className="panel-flat flex flex-col gap-3 p-4 transition hover:bg-[var(--surface-hover)]"
                     style={{ borderColor: `color-mix(in srgb, ${farbe} 22%, transparent)` }}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -355,7 +364,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
                         <button
                           key={k.slug}
                           onClick={() => onOeffnen(k.slug)}
-                          className="rounded-lg px-2 py-1 text-[10.5px] text-muted transition hover:bg-white/5"
+                          className="rounded-lg px-2 py-1 text-[10.5px] text-muted transition hover:bg-[var(--surface-hover)]"
                           style={{ border: '1px solid var(--border-soft)' }}
                         >
                           {k.titel.length > 26 ? k.titel.slice(0, 24) + '…' : k.titel}
@@ -371,7 +380,7 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
         )}
 
         <p className="pt-2 text-[11px] leading-relaxed text-faint">
-          Interne Schulungsplattform · die mitgelieferten Inhalte sind Beispiele und fachlich nicht geprüft ·
+          Beta der internen Schulungsplattform · Inhalte sind Demo-Inhalte und fachlich nicht freigegeben ·
           Personen außer dem Admin-Konto sind frei erfunden
         </p>
       </div>

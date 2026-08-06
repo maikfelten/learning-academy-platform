@@ -26,6 +26,7 @@ export const STATUS = {
   offen: { label: 'Offen', ton: 'neutral' },
 }
 
+/** Flächenwerte: Punkte, Balken, Icon-Hintergründe. */
 export const TON_FARBE = {
   ok: 'var(--color-status-ok)',
   soon: 'var(--color-status-soon)',
@@ -34,7 +35,16 @@ export const TON_FARBE = {
   neutral: 'var(--color-anthrazit-50)',
 }
 
-/** Formats a due date: "in 25 days" / "overdue by 31 days" / "due today". */
+/** Textwerte derselben Töne - je Theme auf über 4,5:1 gebracht. */
+export const TON_TEXT = {
+  ok: 'var(--status-ok-text)',
+  soon: 'var(--status-soon-text)',
+  late: 'var(--status-late-text)',
+  info: 'var(--color-info-text)',
+  neutral: 'var(--text-muted)',
+}
+
+/** "in 25 Tagen" / "seit 31 Tagen überfällig" / "heute fällig" */
 export function fristText(tage) {
   if (tage === null || tage === undefined) return null
   if (tage < 0) return `seit ${Math.abs(tage)} ${Math.abs(tage) === 1 ? 'Tag' : 'Tagen'} überfällig`
@@ -53,11 +63,23 @@ export function relativeZeit(iso) {
   return datumDe(iso)
 }
 
+/**
+ * Akzente je Kategorie.
+ *   farbe → Flächen und Icons (3:1 genügt für Grafik)
+ *   text  → dieselbe Farbe für Beschriftungen, per Theme lesbar gehalten
+ */
 export const AKZENT = {
-  gruen: { farbe: '#38A446', kontrast: '#ffffff' },
-  blau: { farbe: '#00A1FF', kontrast: '#062133' },
-  anthrazit: { farbe: '#7D7D7D', kontrast: '#ffffff' },
-  rot: { farbe: '#E63946', kontrast: '#ffffff' },
+  gruen: { farbe: '#38A446', text: 'var(--color-akzent-text)', aufDunkel: '#8FD398' },
+  blau: { farbe: '#00A1FF', text: 'var(--color-info-text)', aufDunkel: '#7FD1FF' },
+  anthrazit: { farbe: '#6B6B6B', text: 'var(--text-muted)', aufDunkel: '#C6C6C6' },
+  rot: { farbe: '#E63946', text: 'var(--status-late-text)', aufDunkel: '#FF9AA2' },
 }
 
 export const akzentFarbe = (name) => (AKZENT[name] ?? AKZENT.anthrazit).farbe
+export const akzentText = (name) => (AKZENT[name] ?? AKZENT.anthrazit).text
+
+/**
+ * Für Cover und Hero: die Fläche ist dort in beiden Themes dunkel, deshalb
+ * braucht die Beschriftung eine aufgehellte Variante statt der Hausfarbe.
+ */
+export const akzentAufDunkel = (name) => (AKZENT[name] ?? AKZENT.anthrazit).aufDunkel

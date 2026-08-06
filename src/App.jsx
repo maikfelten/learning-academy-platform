@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './lib/api.js'
-import { branding } from './lib/branding.js'
 import AppShell from './components/AppShell.jsx'
 import { Spinner } from './components/ui.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -10,13 +9,21 @@ import CoursePage from './pages/CoursePage.jsx'
 import ProfilePage, { CertificatesPage, SavedPage } from './pages/ProfilePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import TeamPage from './pages/TeamPage.jsx'
+import LeaderboardPage from './pages/LeaderboardPage.jsx'
+import PerformancePage from './pages/PerformancePage.jsx'
+import AdminPage from './pages/admin/AdminPage.jsx'
+import CourseEditor from './pages/admin/CourseEditor.jsx'
+import PersonDetail from './pages/admin/PersonDetail.jsx'
 
 const PFAD_ZU_SCHLUESSEL = {
   '/': 'bibliothek',
   '/gespeichert': 'gespeichert',
   '/nachweise': 'nachweise',
+  '/rangliste': 'rangliste',
   '/profil': 'profil',
   '/bereich': 'bereich',
+  '/performance': 'performance',
+  '/verwaltung': 'verwaltung',
   '/einstellungen': 'einstellungen',
 }
 
@@ -27,8 +34,9 @@ export default function App() {
   const [tab, setTab] = useState('Entdecken')
   const [bibliothek, setBibliothek] = useState(null)
   const [schluessel, setSchluessel] = useState(0)
+  const [adminReiter, setAdminReiter] = useState('kurse')
 
-  /* ------------------------------------------------------------------- Auth */
+  /* ------------------------------------------------------------- Anmeldung */
   useEffect(() => {
     api
       .me()
@@ -51,7 +59,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', beiZurueck)
   }, [])
 
-  /* ---------------------------------------------------------------- Library */
+  /* ------------------------------------------------------------- Bibliothek */
   const bibliothekLaden = useCallback(() => {
     if (!user || user.passwort_wechsel) return
     api
@@ -64,7 +72,11 @@ export default function App() {
     bibliothekLaden()
   }, [bibliothekLaden, schluessel])
 
-  const aktualisieren = useCallback(() => setSchluessel((s) => s + 1), [])
+  const aktualisieren = useCallback(() => {
+    setSchluessel((s) => s + 1)
+    // Level kann sich durch einen Abschluss geändert haben
+    api.me().then(({ user }) => setUser(user)).catch(() => {})
+  }, [])
 
   async function abmelden() {
     await api.logout().catch(() => {})
@@ -75,11 +87,11 @@ export default function App() {
 
   async function speichernUmschalten(slug) {
     await api.speichern(slug).catch(() => {})
-    aktualisieren()
+    setSchluessel((s) => s + 1)
   }
 
-  /* ------------------------------------------------------------------ Views */
-  if (user === undefined) return <Spinner label={`${branding.plattform} wird geladen …`} />
+  /* --------------------------------------------------------------- Ansichten */
+  if (user === undefined) return <Spinner label="Schulungsplattform wird geladen …" />
   if (!user) return <LoginPage onLogin={(u) => { setUser(u); navigate('/') }} />
   if (user.passwort_wechsel)
     return (
@@ -93,12 +105,35 @@ export default function App() {
     )
 
   const kursTreffer = pfad.match(/^\/kurs\/([^/]+)$/)
-  const aktiv = kursTreffer ? 'bibliothek' : (PFAD_ZU_SCHLUESSEL[pfad] ?? 'bibliothek')
+  const editorTreffer = pfad.match(/^\/verwaltung\/kurs\/([^/]+)$/)
+  const personTreffer = pfad.match(/^\/verwaltung\/person\/([^/]+)$/)
+  const perfTreffer = pfad.match(/^\/performance\/([^/]+)$/)
+
+  const aktiv = kursTreffer
+    ? 'bibliothek'
+    : perfTreffer
+      ? 'performance'
+      : editorTreffer || personTreffer
+        ? 'verwaltung'
+        : (PFAD_ZU_SCHLUESSEL[pfad] ?? 'bibliothek')
+
   const tabs = pfad === '/' ? ['Entdecken', ...(bibliothek?.kategorien ?? [])] : null
 
   let inhalt
   if (kursTreffer) {
     inhalt = <CoursePage slug={kursTreffer[1]} navigate={navigate} onGeaendert={aktualisieren} />
+  } else if (editorTreffer) {
+    inhalt = <CourseEditor slug={editorTreffer[1]} navigate={navigate} />
+  } else if (personTreffer) {
+    inhalt = <PersonDetail id={personTreffer[1]} navigate={navigate} />
+  } else if (pfad === '/verwaltung') {
+    inhalt = <AdminPage navigate={navigate} reiter={adminReiter} setReiter={setAdminReiter} />
+  } else if (perfTreffer) {
+    inhalt = <PerformancePage user={user} personId={perfTreffer[1]} navigate={navigate} />
+  } else if (pfad === '/performance') {
+    inhalt = <PerformancePage user={user} navigate={navigate} />
+  } else if (pfad === '/rangliste') {
+    inhalt = <LeaderboardPage />
   } else if (pfad === '/profil') {
     inhalt = (
       <ProfilePage

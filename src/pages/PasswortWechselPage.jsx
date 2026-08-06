@@ -1,9 +1,9 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { KeyRound, ShieldCheck } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { Fehlermeldung } from '../components/ui.jsx'
 
-/** First sign-in: the initial password handed out by the admin must be changed. */
+/** Erst-Login: das vergebene Startpasswort muss gewechselt werden. */
 export default function PasswortWechselPage({ user, onFertig }) {
   const [alt, setAlt] = useState('')
   const [neu, setNeu] = useState('')
@@ -30,8 +30,8 @@ export default function PasswortWechselPage({ user, onFertig }) {
     <main className="grid min-h-screen place-items-center px-4 py-10">
       <div className="animate-rise panel w-full max-w-lg p-8">
         <div className="mb-6 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl" style={{ background: 'color-mix(in srgb, var(--color-akzent) 18%, transparent)' }}>
-            <KeyRound size={20} style={{ color: 'var(--color-akzent)' }} />
+          <span className="grid h-11 w-11 place-items-center rounded-2xl" style={{ background: 'color-mix(in srgb, var(--color-mis-gruen) 18%, transparent)' }}>
+            <KeyRound size={20} style={{ color: 'var(--color-mis-gruen)' }} />
           </span>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Passwort festlegen</h1>

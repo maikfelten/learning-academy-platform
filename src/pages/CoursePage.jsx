@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,24 +12,46 @@ import {
   FileBadge,
   FileText,
   Film,
+  Headphones,
   Lock,
+  Package,
   PartyPopper,
   Repeat,
   Trophy,
   Upload,
+  Youtube,
 } from 'lucide-react'
 import { api } from '../lib/api.js'
 import Markdown from '../components/Markdown.jsx'
 import LessonVideo from '../components/LessonVideo.jsx'
+import LessonYouTube from '../components/LessonYouTube.jsx'
 import QuizRunner from '../components/QuizRunner.jsx'
 import CourseCover from '../components/CourseCover.jsx'
 import { DemoHinweis, Fehlermeldung, ProgressBar, Spinner, StatusPill } from '../components/ui.jsx'
 import { akzentFarbe, datumDe, dauer, fristText } from '../lib/format.js'
 
-const TYP_ICON = { video: Film, text: FileText, pdf: FileBadge, link: ExternalLink, quiz: ClipboardList }
-const TYP_LABEL = { video: 'Video', text: 'Lektion', pdf: 'Dokument', link: 'Externe Schulung', quiz: 'Quiz' }
+const TYP_ICON = {
+  video: Film,
+  audio: Headphones,
+  text: FileText,
+  pdf: FileBadge,
+  link: ExternalLink,
+  quiz: ClipboardList,
+  youtube: Youtube,
+  scorm: Package,
+}
+const TYP_LABEL = {
+  video: 'Video',
+  audio: 'Audio',
+  text: 'Lektion',
+  pdf: 'Dokument',
+  link: 'Externe Schulung',
+  quiz: 'Quiz',
+  youtube: 'Video (YouTube)',
+  scorm: 'SCORM-Paket',
+}
 
-/* ------------------------------------------------------- external training */
+/* -------------------------------------------------------- externe Schulung */
 
 function ExterneLektion({ lektion, onFertig, setFehler }) {
   const [bestaetigt, setBestaetigt] = useState(false)
@@ -65,11 +87,11 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
       <div
         className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"
         style={{
-          background: 'color-mix(in srgb, var(--color-info) 10%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
+          background: 'color-mix(in srgb, var(--color-mis-blau) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-mis-blau) 30%, transparent)',
         }}
       >
-        <ExternalLink size={22} style={{ color: 'var(--color-info)' }} className="shrink-0" />
+        <ExternalLink size={22} style={{ color: 'var(--color-mis-blau)' }} className="shrink-0" />
         <div className="flex-1">
           <h3 className="text-[14px] font-semibold">Diese Schulung läuft beim externen Anbieter</h3>
           <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{lektion.link_hinweis}</p>
@@ -84,7 +106,7 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
       {nachweis ? (
         <div className="panel-flat space-y-2 p-5">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={17} style={{ color: 'var(--color-akzent)' }} />
+            <CheckCircle2 size={17} style={{ color: 'var(--color-mis-gruen)' }} />
             <h3 className="text-[14px] font-semibold">Teilnahme bestätigt</h3>
           </div>
           <p className="text-[12.5px] text-muted">
@@ -108,17 +130,17 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
               className="mt-0.5 h-4 w-4 accent-[#38A446]"
             />
             <span className="text-muted">
-              Ich habe die Schulung <strong className="font-semibold text-white">vollständig abgeschlossen</strong> und
+              Ich habe die Schulung <strong className="font-semibold text-[var(--text-strong)]">vollständig abgeschlossen</strong> und
               bestätige das wahrheitsgemäß.
             </span>
           </label>
 
           <div>
             <div className="mb-1.5 text-[12.5px] font-medium">
-              Zertifikat hochladen {lektion.link_nachweis ? <span style={{ color: 'var(--color-status-late)' }}>· erforderlich</span> : '· optional'}
+              Zertifikat hochladen {lektion.link_nachweis ? <span style={{ color: 'var(--status-late-text)' }}>· erforderlich</span> : '· optional'}
             </div>
             <label
-              className="flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-3 transition hover:bg-white/5"
+              className="flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-3 transition hover:bg-[var(--surface-hover)]"
               style={{ border: '1px dashed var(--border-strong)' }}
             >
               <Upload size={16} className="text-faint" />
@@ -145,7 +167,7 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
   )
 }
 
-/* ------------------------------------------------------------ Course page */
+/* ------------------------------------------------------------- Kursseite */
 
 export default function CoursePage({ slug, navigate, onGeaendert }) {
   const [kurs, setKurs] = useState(null)
@@ -190,7 +212,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
   const letzte = index === kurs.lektionen.length - 1
 
   const videoBereit =
-    lektion.typ !== 'video' ||
+    !['video', 'youtube'].includes(lektion.typ) ||
     kurs.strenge === 'frei' ||
     kurs.vorspulen_erlaubt ||
     Math.max(videoProzent, lektion.prozent) >= 95
@@ -225,10 +247,10 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
     window.open(`/api/nachweise/${id}/pdf`, '_blank', 'noopener')
   }
 
-  /* ---------------------------------------------------------------- View */
+  /* ------------------------------------------------------------- Ansicht */
   return (
     <div className="animate-fade space-y-4">
-      {/* Header */}
+      {/* Kopf */}
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn btn-ghost h-9 px-3.5 text-[12.5px]" onClick={() => navigate('/')}>
           <ArrowLeft size={15} />
@@ -277,7 +299,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
                   {fristText(kurs.tage_bis_faellig)}
                 </span>
               )}
-              <button className="flex items-center gap-1.5 transition hover:text-white" onClick={speichern}>
+              <button className="flex items-center gap-1.5 transition hover:text-[var(--text-strong)]" onClick={speichern}>
                 {kurs.gespeichert ? <BookmarkCheck size={13} style={{ color: farbe }} /> : <Bookmark size={13} />}
                 {kurs.gespeichert ? 'Gemerkt' : 'Merken'}
               </button>
@@ -296,11 +318,11 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
         <div
           className="flex flex-col items-center gap-4 rounded-2xl p-6 text-center"
           style={{
-            background: 'color-mix(in srgb, var(--color-akzent) 12%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-akzent) 34%, transparent)',
+            background: 'color-mix(in srgb, var(--color-mis-gruen) 12%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-mis-gruen) 34%, transparent)',
           }}
         >
-          <span className="grid h-14 w-14 place-items-center rounded-full" style={{ background: 'var(--color-akzent)' }}>
+          <span className="grid h-14 w-14 place-items-center rounded-full" style={{ background: 'var(--color-mis-gruen)' }}>
             <Trophy size={26} color="#fff" />
           </span>
           <div>
@@ -327,7 +349,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
       )}
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Lesson list */}
+        {/* Lektionsliste */}
         <aside className="w-full shrink-0 lg:w-[286px]">
           <div className="panel-flat p-3">
             <h2 className="mb-2 px-1.5 text-[12px] font-semibold uppercase tracking-wider text-faint">Inhalte</h2>
@@ -342,13 +364,13 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
                     onClick={() => setIndex(i)}
                     className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-45"
                     style={{
-                      background: aktiv ? 'color-mix(in srgb, #fff 8%, transparent)' : 'transparent',
+                      background: aktiv ? 'var(--tint-3)' : 'transparent',
                       border: `1px solid ${aktiv ? 'var(--border-soft)' : 'transparent'}`,
                     }}
                   >
                     <span className="shrink-0">
                       {l.erledigt ? (
-                        <CheckCircle2 size={17} style={{ color: 'var(--color-akzent)' }} />
+                        <CheckCircle2 size={17} style={{ color: 'var(--color-mis-gruen)' }} />
                       ) : !l.frei ? (
                         <Lock size={15} className="text-faint" />
                       ) : (
@@ -371,7 +393,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
           </div>
         </aside>
 
-        {/* Lesson content */}
+        {/* Lektionsinhalt */}
         <main className="min-w-0 flex-1 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -382,7 +404,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
               <h2 className="mt-0.5 text-xl font-medium tracking-tight">{lektion.titel}</h2>
             </div>
             {lektion.erledigt && (
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: 'var(--color-akzent)' }}>
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: 'var(--color-akzent-text)' }}>
                 <CheckCircle2 size={14} />
                 erledigt
               </span>
@@ -400,9 +422,20 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
             />
           )}
 
+          {lektion.typ === 'youtube' && (
+            <LessonYouTube key={lektion.id} lektion={lektion} onFortschritt={setVideoProzent} />
+          )}
+
           {lektion.typ === 'text' && (
             <div className="panel-flat px-5 py-1">
               <Markdown text={lektion.text_inhalt} />
+            </div>
+          )}
+
+          {lektion.typ === 'scorm' && (
+            <div className="panel-flat p-8 text-center text-sm text-faint">
+              SCORM-Pakete werden noch nicht abgespielt. Die Lektion ist angelegt, der Player fehlt —
+              bis dahin bitte als externe Schulung mit Nachweis-Upload führen.
             </div>
           )}
 
@@ -451,7 +484,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
               </div>
             ))}
 
-          {/* Footer with the completion action */}
+          {/* Fußzeile mit Abschluss-Aktion */}
           {lektion.typ !== 'quiz' && lektion.typ !== 'link' && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4" style={{ borderColor: 'var(--border-soft)' }}>
               <button

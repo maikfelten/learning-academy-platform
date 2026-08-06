@@ -1,16 +1,11 @@
-import { akzentFarbe } from '../lib/format.js'
-import { branding } from '../lib/branding.js'
+import { akzentAufDunkel, akzentFarbe } from '../lib/format.js'
 
 /**
- * Typographic course cover.
+ * Typografisches Kurs-Cover.
  *
- * Instead of stock photography: a dark surface, the course title, a category
- * label, a geometric motif and one accent colour per category. A wall of 60
- * courses still looks coherent - no image licences, no internet access needed.
- *
- * Four motifs are available (`cover_motiv`): raute, raster, linien, welle.
- * To use your own brand shape, replace the `Motiv` function below.
- * If an admin uploads an image (`cover_bild`), that image is shown instead.
+ * Statt Stockfotos: Anthrazit-Fläche, Kurstitel in Montserrat, Kategorie-Label,
+ * ein geometrisches Motiv und ein Akzentton je Kategorie.
+ * Lädt der Admin ein eigenes Bild hoch (cover_bild), wird das stattdessen gezeigt.
  */
 
 function Motiv({ art, farbe, id }) {
@@ -45,20 +40,19 @@ function Motiv({ art, farbe, id }) {
         ))}
       </g>
     )
-  // raute (default): nested squares standing on one corner
+  // raute: dekoratives Element, stark vergrößert
   return (
-    <g opacity="0.42" transform="translate(122 168) rotate(45)">
-      {[0, 1, 2, 3].map((i) => (
-        <rect
+    <g opacity="0.42" transform="translate(96 96) scale(1.35)">
+      {[0, 1, 2].map((i) => (
+        <path
           key={i}
-          x={-34 - i * 26}
-          y={-34 - i * 26}
-          width={68 + i * 52}
-          height={68 + i * 52}
+          d="M 0 0 L 34 34 L 0 68"
+          transform={`translate(${i * 30} 0)`}
           stroke={farbe}
-          strokeWidth="7"
+          strokeWidth="9"
           fill="none"
-          opacity={0.9 - i * 0.2}
+          strokeLinejoin="miter"
+          opacity={0.85 - i * 0.18}
         />
       ))}
     </g>
@@ -67,13 +61,14 @@ function Motiv({ art, farbe, id }) {
 
 export default function CourseCover({ kurs, groesse = 'md', className = '' }) {
   const farbe = akzentFarbe(kurs.akzent)
+  const schrift = akzentAufDunkel(kurs.akzent)
   const id = kurs.slug ?? 'x'
   const titelGroesse = groesse === 'sm' ? 15 : groesse === 'lg' ? 26 : 19
   const zeilen = kurs.titel.length > 34 ? 4 : 3
 
   if (kurs.cover_bild)
     return (
-      <div className={`relative overflow-hidden ${className}`}>
+      <div className={`medien relative overflow-hidden ${className}`}>
         <img src={kurs.cover_bild} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-3">
@@ -87,7 +82,8 @@ export default function CourseCover({ kurs, groesse = 'md', className = '' }) {
     )
 
   return (
-    <div className={`relative overflow-hidden ${className}`} aria-hidden="false">
+    /* medien: dunkle Fläche in beiden Themes - Beschriftung bleibt hell */
+    <div className={`medien relative overflow-hidden ${className}`} aria-hidden="false">
       <svg viewBox="0 0 200 300" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
         <defs>
           <linearGradient id={`g-${id}`} x1="0" y1="0" x2="1" y2="1">
@@ -103,18 +99,18 @@ export default function CourseCover({ kurs, groesse = 'md', className = '' }) {
         <rect width="200" height="300" fill={`url(#g-${id})`} />
         <rect width="200" height="300" fill={`url(#r-${id})`} />
         <Motiv art={kurs.cover_motiv ?? 'raute'} farbe={farbe} id={id} />
-        {/* Book-spine edge */}
+        {/* Buchrücken-Kante */}
         <rect x="0" y="0" width="5" height="300" fill={farbe} />
         <rect x="5" y="0" width="1.5" height="300" fill="#000" opacity="0.35" />
       </svg>
 
-      {/* At small sizes the cover stays plain - the title is rendered next to it */}
+      {/* In kleinen Größen bleibt das Cover reine Fläche - der Titel steht daneben */}
       {groesse === 'sm' ? null : (
       <div className="relative flex h-full flex-col justify-between p-3.5">
         <div className="flex items-start justify-between gap-2">
           <span
             className="text-[9px] font-bold uppercase leading-tight tracking-[0.16em]"
-            style={{ color: farbe }}
+            style={{ color: schrift }}
           >
             {kurs.kategorie === 'Pflichtschulungen' ? 'Pflicht' : kurs.kategorie}
           </span>
@@ -139,8 +135,8 @@ export default function CourseCover({ kurs, groesse = 'md', className = '' }) {
           >
             {kurs.titel}
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/45">
-            <span className="truncate">{kurs.anbieter ?? branding.plattform}</span>
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[rgba(255,255,255,0.62)]">
+            <span className="truncate">{kurs.anbieter ?? 'Schulungsplattform'}</span>
           </div>
         </div>
       </div>

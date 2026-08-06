@@ -1,24 +1,34 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Bell,
   BookmarkCheck,
   ChevronDown,
   FileBadge,
   Home,
+  LayoutGrid,
   LogOut,
+  Moon,
   Search,
   Settings,
+  Sun,
+  Target,
+  Trophy,
   UserRound,
   Users,
 } from 'lucide-react'
 import { StatusPill } from './ui.jsx'
+import { LevelRing } from './Level.jsx'
+import { themeLesen, themeSetzen } from '../lib/theme.js'
 
 const RAIL = [
   { key: 'bibliothek', pfad: '/', icon: Home, label: 'Startseite' },
   { key: 'gespeichert', pfad: '/gespeichert', icon: BookmarkCheck, label: 'Gemerkte Schulungen' },
   { key: 'nachweise', pfad: '/nachweise', icon: FileBadge, label: 'Meine Nachweise' },
+  { key: 'rangliste', pfad: '/rangliste', icon: Trophy, label: 'Rangliste' },
   { key: 'profil', pfad: '/profil', icon: UserRound, label: 'Profil' },
+  { key: 'performance', pfad: '/performance', icon: Target, label: 'Ziele und Performance' },
   { key: 'bereich', pfad: '/bereich', icon: Users, label: 'Bereichsübersicht', rollen: ['admin', 'fuehrungskraft'] },
+  { key: 'verwaltung', pfad: '/verwaltung', icon: LayoutGrid, label: 'Verwaltung', rollen: ['admin'] },
   { key: 'einstellungen', pfad: '/einstellungen', icon: Settings, label: 'Einstellungen' },
 ]
 
@@ -37,6 +47,7 @@ export default function AppShell({
 }) {
   const [menuOffen, setMenuOffen] = useState(false)
   const [glockeOffen, setGlockeOffen] = useState(false)
+  const [theme, setTheme] = useState(themeLesen)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -53,13 +64,31 @@ export default function AppShell({
   const eintraege = RAIL.filter((e) => !e.rollen || e.rollen.includes(user.rolle))
   const offeneHinweise = (hinweise?.ueberfaellig ?? 0) + (hinweise?.bald_faellig ?? 0)
 
+  function themeUmschalten() {
+    setTheme(themeSetzen(theme === 'dunkel' ? 'hell' : 'dunkel'))
+  }
+
+  /* Springt auf der Startseite zum Abschnitt Pflichtschulungen. Liegt man
+     woanders, wird erst dorthin navigiert und danach gescrollt. */
+  function zuPflichtschulungen() {
+    setGlockeOffen(false)
+    const scrollen = () => document.getElementById('pflichtschulungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (aktiv === 'bibliothek') scrollen()
+    else {
+      navigate('/')
+      setTimeout(scrollen, 220)
+    }
+  }
+
   return (
-    <div className="min-h-screen p-2 sm:p-3 lg:p-4">
-      <div className="panel relative mx-auto flex min-h-[calc(100vh-1rem)] w-full max-w-[1560px] flex-col overflow-hidden lg:min-h-[calc(100vh-2rem)] lg:flex-row">
-        {/* ------------------------------------------------------- Icon rail (left) */}
+    /* Feste Höhe: dadurch bleibt die Icon-Leiste auf jeder Seite an derselben
+       Stelle und der Inhalt scrollt in seinem eigenen Bereich. */
+    <div className="h-screen p-2 sm:p-3 lg:p-4">
+      <div className="panel relative mx-auto flex h-[calc(100vh-1rem)] w-full max-w-[1560px] flex-col overflow-hidden lg:h-[calc(100vh-2rem)] lg:flex-row">
+        {/* -------------------------------------------------- Icon-Leiste links */}
         <nav
           className="absolute left-3 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-1.5 rounded-3xl px-2 py-3 lg:flex"
-          style={{ background: 'color-mix(in srgb, #ffffff 5%, transparent)', border: '1px solid var(--border-soft)' }}
+          style={{ background: 'var(--tint-2)', border: '1px solid var(--border-soft)' }}
           aria-label="Hauptnavigation"
         >
           {eintraege.map((e) => (
@@ -72,17 +101,26 @@ export default function AppShell({
               aria-current={aktiv === e.key ? 'page' : undefined}
             >
               <e.icon size={19} strokeWidth={aktiv === e.key ? 2.3 : 1.9} />
-              <span className="pointer-events-none absolute left-[120%] z-40 hidden whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium shadow-lg group-hover:block"
-                style={{ background: 'var(--color-ink-700)', border: '1px solid var(--border-soft)' }}>
+              {/* Tooltip: dunkle Fläche in beiden Themes, deshalb Schrift fest auf
+                  Weiß. Ohne das erbt sie die Textfarbe des Themes und stünde im
+                  hellen Modus dunkel auf dunkel. */}
+              <span
+                className="pointer-events-none absolute left-[120%] z-40 hidden whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium shadow-lg group-hover:block"
+                style={{
+                  background: 'var(--color-ink-800)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                }}
+              >
                 {e.label}
               </span>
             </button>
           ))}
         </nav>
 
-        {/* ------------------------------------------------------- Content column */}
+        {/* ------------------------------------------------------ Inhaltsspalte */}
         <div className="flex min-w-0 flex-1 flex-col lg:pl-[76px]">
-          {/* Header */}
+          {/* Kopfzeile */}
           <header className="flex flex-col gap-3 px-3 pt-3 sm:px-5 sm:pt-4 lg:flex-row lg:items-center lg:gap-4">
             <div className="relative w-full lg:w-[260px] lg:shrink-0">
               <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
@@ -110,6 +148,15 @@ export default function AppShell({
             {!tabs && <div className="flex-1" />}
 
             <div className="flex items-center gap-2 lg:gap-3" ref={menuRef}>
+              <button
+                className="btn-icon h-10 w-10"
+                onClick={themeUmschalten}
+                aria-label={theme === 'dunkel' ? 'Auf helle Ansicht wechseln' : 'Auf dunkle Ansicht wechseln'}
+                title={theme === 'dunkel' ? 'Helle Ansicht' : 'Dunkle Ansicht'}
+              >
+                {theme === 'dunkel' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+
               <div className="relative">
                 <button
                   className="btn-icon h-10 w-10"
@@ -148,7 +195,7 @@ export default function AppShell({
                             <StatusPill status="bald_faellig" tage={hinweise.bald_faellig_tage ?? 20} klein />
                           </div>
                         )}
-                        <button className="btn btn-ghost mt-1 h-9 w-full text-xs" onClick={() => { setGlockeOffen(false); navigate('/') }}>
+                        <button className="btn btn-ghost mt-1 h-9 w-full text-xs" onClick={zuPflichtschulungen}>
                           Zu den Pflichtschulungen
                         </button>
                       </div>
@@ -161,23 +208,18 @@ export default function AppShell({
               </div>
 
               <button
-                className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/5"
+                className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-[var(--surface-hover)]"
                 style={{ border: '1px solid var(--border-soft)' }}
                 onClick={() => {
                   setMenuOffen((o) => !o)
                   setGlockeOffen(false)
                 }}
               >
-                <span
-                  className="grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold"
-                  style={{ background: 'var(--color-akzent)', color: '#fff' }}
-                >
-                  {user.initialen}
-                </span>
+                <LevelRing level={user.level} initialen={user.initialen} groesse={34} />
                 <span className="hidden text-left leading-tight sm:block">
                   <span className="block text-[13px] font-semibold">{user.name}</span>
                   <span className="block text-[10px] text-faint">
-                    {user.abteilung} · {user.standort}
+                    {user.level ? `Level ${user.level.stufe} · ${user.level.rang}` : `${user.abteilung} · ${user.standort}`}
                   </span>
                 </span>
                 <ChevronDown size={14} className="text-faint" />
@@ -200,7 +242,7 @@ export default function AppShell({
                   ].map((e) => (
                     <button
                       key={e.pfad}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-white/5"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-[var(--surface-hover)]"
                       onClick={() => {
                         setMenuOffen(false)
                         navigate(e.pfad)
@@ -212,7 +254,7 @@ export default function AppShell({
                   ))}
                   <div className="my-1 h-px" style={{ background: 'var(--border-soft)' }} />
                   <button
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-white/5"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-[var(--surface-hover)]"
                     onClick={onLogout}
                   >
                     <LogOut size={15} className="text-faint" />
@@ -223,11 +265,11 @@ export default function AppShell({
             </div>
           </header>
 
-          {/* Content */}
+          {/* Inhalt */}
           <div className="scroll-slim flex-1 overflow-y-auto px-3 pb-24 pt-4 sm:px-5 lg:pb-6">{children}</div>
         </div>
 
-        {/* ------------------------------------------------- Bottom nav on mobile */}
+        {/* -------------------------------------------- Navigation auf dem Handy */}
         <nav
           className="fixed inset-x-2 bottom-2 z-30 flex items-center justify-around rounded-2xl px-2 py-1.5 lg:hidden"
           style={{ background: 'color-mix(in srgb, var(--color-ink-750) 92%, transparent)', border: '1px solid var(--border-soft)', backdropFilter: 'blur(14px)' }}

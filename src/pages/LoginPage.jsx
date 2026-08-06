@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff, GraduationCap, Info, LogIn, ShieldCheck, UserRound } from 'lucide-react'
 import { api } from '../lib/api.js'
-import { branding } from '../lib/branding.js'
 import { Fehlermeldung } from '../components/ui.jsx'
 
 const SCHRITTE = [
@@ -10,16 +9,11 @@ const SCHRITTE = [
   { nummer: 3, titel: 'Nachweis erhalten', text: 'Nach jedem Abschluss liegt dein Zertifikat in deinem Profil.' },
 ]
 
-/**
- * Quick access to the sample accounts - a convenience for the first look only.
- * Remove this block together with the sample data before going live
- * (see README, section "Before going live").
- */
 const DEMO_ZUGAENGE = [
-  { rolle: 'Admin', name: 'Alex Beispiel', email: 'admin@example.com', passwort: 'Admin2026demo' },
-  { rolle: 'Führungskraft', name: 'Lena Brandt', email: 'lena.brandt@example.com', passwort: 'Demo2026start' },
-  { rolle: 'Lernender (neu)', name: 'Tobias Krayer', email: 'tobias.krayer@example.com', passwort: 'Demo2026start' },
-  { rolle: 'Erst-Login', name: 'Pawel Nowak', email: 'pawel.nowak@example.com', passwort: 'Willkommen2026' },
+  { rolle: 'Admin', name: 'Admin User', email: 'admin@example.com', passwort: 'Demo-Admin2026' },
+  { rolle: 'Führungskraft', name: 'Manager User', email: 'manager@example.com', passwort: 'Demo2026' },
+  { rolle: 'Lernender (neu)', name: 'Trainee User', email: 'trainee@example.com', passwort: 'Demo2026' },
+  { rolle: 'Erst-Login', name: 'New User', email: 'newuser@example.com', passwort: 'Welcome2026' },
 ]
 
 function Schritt({ nummer, titel, text, aktiv }) {
@@ -70,16 +64,16 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <main className="flex min-h-screen w-full p-2 lg:h-screen lg:overflow-hidden lg:p-4">
-      {/* ------------------------------------------------------- Left column */}
+      {/* ------------------------------------------------------ Linke Spalte */}
       <div
-        className="relative hidden h-full w-[52%] flex-col items-center justify-end overflow-hidden rounded-3xl px-12 pb-24 shadow-2xl lg:flex"
+        className="medien relative hidden h-full w-[52%] flex-col items-center justify-center overflow-hidden rounded-3xl px-12 py-14 shadow-2xl lg:flex"
         style={{
           background:
             'radial-gradient(120% 90% at 10% 0%, #4a4c4c 0%, #2b2d2d 45%, #141515 100%)',
         }}
       >
         <img
-          src="/brand/mark.svg"
+          src="/brand/bildmarke-weiss.svg"
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute -right-[18%] top-[8%] w-[92%] opacity-[0.045]"
@@ -91,9 +85,9 @@ export default function LoginPage({ onLogin }) {
 
         <div className="relative z-10 w-full max-w-sm space-y-8">
           <div className="animate-rise flex items-center gap-3">
-            <img src="/brand/logo.svg" alt="" aria-hidden="true" className="h-7 w-auto" />
+            <img src="/brand/logo-weiss.svg" alt="Organisation" className="h-7 w-auto" />
             <span className="h-5 w-px bg-white/25" />
-            <span className="text-sm font-semibold tracking-tight text-white/80">{branding.plattform}</span>
+            <span className="text-sm font-semibold tracking-tight text-white/80">Akademie</span>
           </div>
 
           <div className="animate-rise" style={{ animationDelay: '80ms' }}>
@@ -103,8 +97,7 @@ export default function LoginPage({ onLogin }) {
               nachweisbar ist.
             </h1>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/55">
-              Die interne Schulungsplattform von {branding.organisation}. Pflichtschulungen, Fachwissen und Nachweise an
-              einem Ort.
+              Schulungsplattform für Pflichtschulungen, Fachwissen und Nachweise an einem Ort.
             </p>
           </div>
 
@@ -123,18 +116,18 @@ export default function LoginPage({ onLogin }) {
         </div>
       </div>
 
-      {/* ------------------------------------------------------ Right column */}
+      {/* ------------------------------------------------------ Rechte Spalte */}
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-12 sm:px-12 lg:overflow-hidden lg:px-16 lg:py-6 xl:px-24">
         <div className="animate-fade w-full max-w-md space-y-8">
           <div className="flex items-center gap-3 lg:hidden">
-            <img src="/brand/logo.svg" alt="" aria-hidden="true" className="h-6 w-auto" />
-            <span className="text-sm font-semibold text-white/70">{branding.plattform}</span>
+            <img src="/brand/logo-weiss.svg" alt="Organisation" className="h-6 w-auto" />
+            <span className="text-sm font-semibold text-white/70">Akademie</span>
           </div>
 
           <div>
             <h2 className="text-3xl font-medium tracking-tight">Anmelden</h2>
             <p className="mt-1.5 text-sm text-faint">
-              Melde dich mit deiner dienstlichen E-Mail-Adresse an, um deine Schulungen zu sehen.
+              Melde dich an, um deine Schulungen zu sehen.
             </p>
           </div>
 
@@ -152,7 +145,7 @@ export default function LoginPage({ onLogin }) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={`vorname.nachname@${branding.email_domain}`}
+                  placeholder="deine.adresse@example.com"
                   className="field pl-11"
                 />
               </div>
@@ -183,8 +176,7 @@ export default function LoginPage({ onLogin }) {
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-faint">
-                Passwort vergessen? Die Schulungsleitung setzt es zurück —{' '}
-                <span className="text-muted">{branding.support_email}</span>
+                Passwort vergessen? Die Schulungsleitung setzt es zurück — <span className="text-muted">it@mis-gruppe.com</span>
               </p>
             </div>
 
@@ -196,7 +188,7 @@ export default function LoginPage({ onLogin }) {
             </button>
           </form>
 
-          {/* Quick access to the sample accounts. Remove before going live. */}
+          {/* Beta-Hilfe: Demo-Zugänge. Entfällt im Produktivbetrieb. */}
           <div className="panel-flat overflow-hidden">
             <button
               type="button"
@@ -205,7 +197,7 @@ export default function LoginPage({ onLogin }) {
             >
               <span className="flex items-center gap-2 text-xs font-semibold text-muted">
                 <Info size={14} />
-                Beispielzugänge zum Ausprobieren
+                Demo-Zugänge der Beta
               </span>
               <span className="text-[11px] text-faint">{demoOffen ? 'schließen' : 'anzeigen'}</span>
             </button>
@@ -230,8 +222,8 @@ export default function LoginPage({ onLogin }) {
                   </button>
                 ))}
                 <p className="px-2.5 py-1.5 text-[10px] leading-relaxed text-faint">
-                  Alle Personen und Inhalte sind frei erfunden. Vor dem Produktivbetrieb Beispieldaten löschen und
-                  diesen Block entfernen.
+                  Alle Personen außer dem Admin sind frei erfunden. In der Beta liegen bewusst keine echten
+                  Mitarbeiterdaten.
                 </p>
               </div>
             )}
@@ -239,7 +231,7 @@ export default function LoginPage({ onLogin }) {
 
           <div className="flex items-center gap-2 text-[11px] text-faint">
             <GraduationCap size={13} />
-            {branding.organisation} · interne Schulungsplattform
+            Schulungsplattform · Beta
           </div>
         </div>
       </div>

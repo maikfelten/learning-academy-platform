@@ -1,12 +1,12 @@
 /**
- * Certificate as PDF (A4 landscape).
+ * Zertifikat als PDF (A4 quer).
  *
- * Font: Helvetica from the PDF standard set, so the project runs without
- * shipping a font file. To embed a corporate typeface, drop it as TTF/OTF into
- * media/fonts/ and load it here with @pdf-lib/fontkit.
+ * Schrift: Helvetica aus dem PDF-Standardsatz - so bleibt das Projekt ohne
+ * Schriftdatei lauffähig. Eigene Hausschrift als TTF/OTF unter media/fonts/
+ * ablegen und hier mit @pdf-lib/fontkit einbinden.
  *
- * Logo: a PNG at public/brand/logo.png gets embedded - otherwise the
- * organisation name is drawn as text.
+ * Logo: liegt public/brand/logo.png vor, wird es eingebettet - sonst steht dort
+ * der Name der Organisation als Text.
  */
 
 import { readFileSync, existsSync } from 'node:fs'
@@ -34,12 +34,12 @@ export async function zertifikatPdf({ abschluss, user }) {
   const regular = await pdf.embedFont(StandardFonts.Helvetica)
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
 
-  // Border and accent bar
+  // Rahmen und Akzent
   seite.drawRectangle({ x: 0, y: 0, width, height, color: rgb(1, 1, 1) })
   seite.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: GRUEN })
   seite.drawRectangle({ x: 40, y: 40, width: width - 80, height: height - 100, borderColor: HELLGRAU, borderWidth: 1 })
 
-  // Logo if available - otherwise the organisation name as text
+  // Logo
   const logoPfad = join(ROOT, 'public', 'brand', 'logo.png')
   if (existsSync(logoPfad)) {
     const bild = await pdf.embedPng(readFileSync(logoPfad))
@@ -47,13 +47,7 @@ export async function zertifikatPdf({ abschluss, user }) {
     const hoehe = (bild.height / bild.width) * breite
     seite.drawImage(bild, { x: 70, y: height - 70 - hoehe, width: breite, height: hoehe })
   } else {
-    seite.drawText(konfiguration.organisation.toUpperCase(), {
-      x: 70,
-      y: height - 100,
-      size: 20,
-      font: bold,
-      color: ANTHRAZIT,
-    })
+    seite.drawText(konfiguration.organisation.toUpperCase(), { x: 70, y: height - 100, size: 20, font: bold, color: ANTHRAZIT })
   }
 
   let y = height - 190
@@ -84,20 +78,12 @@ export async function zertifikatPdf({ abschluss, user }) {
   const titel = abschluss.titel.length > 62 ? abschluss.titel.slice(0, 60) + '…' : abschluss.titel
   seite.drawText(titel, { x: 70, y, size: 18, font: bold, color: GRUEN })
 
-  // Data block at the bottom
+  // Datenblock unten
   const zeilen = [
     ['Abgeschlossen am', datumDe(abschluss.abgeschlossen_am)],
     ['Gültig bis', abschluss.gueltig_bis ? datumDe(abschluss.gueltig_bis) : 'unbefristet'],
     ['Ergebnis', abschluss.prozent != null ? `${abschluss.prozent} % im Abschlussquiz` : 'ohne Quiz'],
-    [
-      'Nachweisart',
-      {
-        plattform: `${konfiguration.plattform} (online)`,
-        praesenz: 'Präsenzunterweisung',
-        extern: 'externer Anbieter',
-        import: 'Datenübernahme',
-      }[abschluss.quelle] ?? abschluss.quelle,
-    ],
+    ['Nachweisart', { plattform: `${konfiguration.plattform} (online)`, praesenz: 'Präsenzunterweisung', extern: 'externer Anbieter', import: 'Datenübernahme' }[abschluss.quelle] ?? abschluss.quelle],
     ['Anbieter', abschluss.anbieter || konfiguration.plattform],
     ['Nachweisnummer', abschluss.zertifikat_nr],
   ]
@@ -109,7 +95,7 @@ export async function zertifikatPdf({ abschluss, user }) {
     by -= 22
   }
 
-  // Footer
+  // Fußzeile
   seite.drawText(`${konfiguration.organisation} · Interne Schulungsplattform (${konfiguration.plattform})`, {
     x: 70,
     y: 62,
@@ -127,8 +113,8 @@ export async function zertifikatPdf({ abschluss, user }) {
     })
   }
 
-  // Watermark: while the course content is only a sample, this certificate must
-  // never be mistaken for a real proof of training.
+  // Demo-Kennzeichnung: solange der Kursinhalt Demo-Inhalt ist, darf dieses
+  // Zertifikat nicht als echter Nachweis verwendet werden.
   if (abschluss.demo) {
     const text = 'DEMO — fachlich nicht freigegeben'
     seite.drawRectangle({

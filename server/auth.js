@@ -1,9 +1,9 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 
 /**
- * Passwords are hashed with scrypt (built into Node, no dependency required).
- * Single sign-on is the long-term goal; local passwords remain as the fallback
- * for staff without a company account - shop floor, shared devices, contractors.
+ * Passwörter werden mit scrypt gehasht (in Node eingebaut, keine Abhängigkeit).
+ * Single sign-on ist das Zielbild; lokale Passwörter bleiben der Fallback für
+ * Mitarbeitende ohne persönliches Konto.
  */
 
 const KEYLEN = 64
@@ -23,7 +23,7 @@ export function verifyPassword(passwort, hash, salt) {
   return timingSafeEqual(kandidat, soll)
 }
 
-/** Minimum rules for local passwords. With SSO the identity provider takes over. */
+/** Mindestregeln für die Beta. Bei SSO übernimmt das später Microsoft. */
 export function passwortRegelnPruefen(passwort) {
   const p = String(passwort || '')
   if (p.length < 8) return 'Das Passwort braucht mindestens 8 Zeichen.'

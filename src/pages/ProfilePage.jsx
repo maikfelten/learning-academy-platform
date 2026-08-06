@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BookmarkX, Building2, CalendarClock, CheckCircle2, Clock3, Download, FileBadge, GraduationCap, Timer } from 'lucide-react'
 import { api } from '../lib/api.js'
+import { LevelKarte, LevelRing } from '../components/Level.jsx'
 import { CourseRow } from '../components/CourseCard.jsx'
 import { ProgressBar, SectionHeader, Spinner, StatusPill } from '../components/ui.jsx'
 import { datumDe, dauer, relativeZeit } from '../lib/format.js'
@@ -43,10 +44,10 @@ function NachweisZeile({ n }) {
         style={{
           background: n.abgelaufen
             ? 'color-mix(in srgb, var(--color-status-late) 14%, transparent)'
-            : 'color-mix(in srgb, var(--color-akzent) 14%, transparent)',
+            : 'color-mix(in srgb, var(--color-mis-gruen) 14%, transparent)',
         }}
       >
-        <FileBadge size={17} style={{ color: n.abgelaufen ? 'var(--color-status-late)' : 'var(--color-akzent)' }} />
+        <FileBadge size={17} style={{ color: n.abgelaufen ? 'var(--color-status-late)' : 'var(--color-mis-gruen)' }} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -81,11 +82,11 @@ function NachweisZeile({ n }) {
   )
 }
 
-/* ----------------------------------------------------------------- Profile */
+/* ------------------------------------------------------------------ Profil */
 
 export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }) {
   const { daten, fehler } = useProfil(schluessel)
-  if (fehler) return <p className="text-sm" style={{ color: 'var(--color-status-late)' }}>{fehler}</p>
+  if (fehler) return <p className="text-sm" style={{ color: 'var(--status-late-text)' }}>{fehler}</p>
   if (!daten) return <Spinner label="Profil wird geladen …" />
 
   const s = daten.statistik
@@ -93,14 +94,9 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
 
   return (
     <div className="animate-fade space-y-6">
-      {/* Header */}
+      {/* Kopf */}
       <div className="panel-flat flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
-        <span
-          className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-xl font-bold"
-          style={{ background: 'var(--color-akzent)', color: '#fff' }}
-        >
-          {user.initialen}
-        </span>
+        <LevelRing level={user.level} initialen={user.initialen} groesse={68} />
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-medium tracking-tight">{user.name}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-faint">
@@ -128,10 +124,12 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
         </div>
       </div>
 
-      {/* Key figures */}
+      <LevelKarte level={user.level} />
+
+      {/* Kennzahlen */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kennzahl icon={CheckCircle2} wert={s.abgeschlossen} label="gültige Abschlüsse" farbe="var(--color-akzent)" />
-        <Kennzahl icon={GraduationCap} wert={daten.laufend.length} label="Schulungen in Arbeit" farbe="var(--color-info)" />
+        <Kennzahl icon={CheckCircle2} wert={s.abgeschlossen} label="gültige Abschlüsse" farbe="var(--color-mis-gruen)" />
+        <Kennzahl icon={GraduationCap} wert={daten.laufend.length} label="Schulungen in Arbeit" farbe="var(--color-mis-blau)" />
         <Kennzahl icon={Timer} wert={dauer(s.lernminuten)} label="absolvierte Lernzeit" farbe="var(--color-anthrazit-50)" />
         <Kennzahl
           icon={Clock3}
@@ -141,7 +139,7 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
         />
       </div>
 
-      {/* In progress */}
+      {/* In Arbeit */}
       {daten.laufend.length > 0 && (
         <section>
           <SectionHeader titel="Aktueller Stand" hinweis="Angefangen und noch nicht abgeschlossen" />
@@ -153,7 +151,7 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
         </section>
       )}
 
-      {/* Mandatory courses */}
+      {/* Pflichtschulungen */}
       <section>
         <SectionHeader titel="Meine Pflichtschulungen" hinweis="Status und Fristen im Überblick" />
         <div className="space-y-2">
@@ -163,7 +161,7 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
         </div>
       </section>
 
-      {/* Certificates */}
+      {/* Nachweise */}
       <section>
         <SectionHeader
           titel="Meine Nachweise"
@@ -182,7 +180,7 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
         )}
       </section>
 
-      {/* External proofs */}
+      {/* Externe Nachweise */}
       {daten.externe_nachweise.length > 0 && (
         <section>
           <SectionHeader titel="Eingereichte Nachweise externer Schulungen" hinweis="Prüfung durch die Schulungsleitung" />
@@ -208,11 +206,11 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
   )
 }
 
-/* ---------------------------------------------------------- Saved courses */
+/* -------------------------------------------------------- Gemerkte Kurse */
 
 export function SavedPage({ schluessel, onOeffnen, onSpeichern }) {
   const { daten, fehler } = useProfil(schluessel)
-  if (fehler) return <p className="text-sm" style={{ color: 'var(--color-status-late)' }}>{fehler}</p>
+  if (fehler) return <p className="text-sm" style={{ color: 'var(--status-late-text)' }}>{fehler}</p>
   if (!daten) return <Spinner label="Gemerkte Schulungen …" />
 
   return (
@@ -239,11 +237,11 @@ export function SavedPage({ schluessel, onOeffnen, onSpeichern }) {
   )
 }
 
-/* ---------------------------------------------------------- Certificates */
+/* ------------------------------------------------------------- Nachweise */
 
 export function CertificatesPage({ schluessel }) {
   const { daten, fehler } = useProfil(schluessel)
-  if (fehler) return <p className="text-sm" style={{ color: 'var(--color-status-late)' }}>{fehler}</p>
+  if (fehler) return <p className="text-sm" style={{ color: 'var(--status-late-text)' }}>{fehler}</p>
   if (!daten) return <Spinner label="Nachweise …" />
 
   const gueltig = daten.nachweise.filter((n) => !n.abgelaufen)

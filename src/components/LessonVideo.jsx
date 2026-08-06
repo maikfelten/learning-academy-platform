@@ -5,16 +5,16 @@ import { sekundenZeit } from '../lib/format.js'
 import { ProgressBar } from './ui.jsx'
 
 /**
- * Video lesson with progress tracking.
+ * Videolektion mit Fortschrittsmessung.
  *
- * Two modes:
- *  1. A video file exists under /media - a real <video> player is used.
- *  2. No file is present - a simulated playback with a real timeline runs
- *     instead. The 95 percent rule, the seek lock and progress persistence
- *     behave identically in both cases.
+ * Zwei Betriebsarten:
+ *  1. Es liegt eine Videodatei unter /media - dann echter <video>-Player.
+ *  2. Es liegt keine Datei vor (Beta-Fall) - dann eine simulierte Wiedergabe
+ *     mit echter Zeitachse. Die 95-Prozent-Regel, das Vorspul-Verbot und die
+ *     Fortschrittsspeicherung verhalten sich in beiden Fällen identisch.
  *
- * Seeking is locked on the first run of strict courses (vorspulenErlaubt=false):
- * the viewer can only jump back to the furthest position already watched.
+ * Vorspulen ist beim Erstdurchlauf strenger Kurse gesperrt (vorspulenErlaubt=false):
+ * Es wird nur bis zur höchsten bereits gesehenen Position gesprungen.
  */
 export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }) {
   const laenge = lektion.video_laenge_sek ?? 300
@@ -22,8 +22,26 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
   const [maxPosition, setMaxPosition] = useState(lektion.max_position_sek ?? 0)
   const [laeuft, setLaeuft] = useState(false)
   const [hinweis, setHinweis] = useState(null)
+  const [streamUrl, setStreamUrl] = useState(null)
   const videoRef = useRef(null)
   const gesendet = useRef(0)
+
+  /* Geschützte Quelle: Der Player holt sich ein kurzlebiges, signiertes Token.
+     Eine kopierte URL ist nach 90 Sekunden wertlos und in einer fremden Session
+     sofort - deshalb steht die Adresse auch nirgends im Markup. */
+  useEffect(() => {
+    let abgebrochen = false
+    if (!lektion.video_vorhanden) return
+    api
+      .streamToken(lektion.id)
+      .then(({ url }) => {
+        if (!abgebrochen) setStreamUrl(url)
+      })
+      .catch(() => setHinweis('Die Wiedergabe konnte nicht freigeschaltet werden. Bitte Seite neu laden.'))
+    return () => {
+      abgebrochen = true
+    }
+  }, [lektion.id, lektion.video_vorhanden])
 
   const prozent = Math.min(100, Math.round((maxPosition / laenge) * 100))
 
@@ -34,13 +52,13 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
         await api.fortschritt(lektion.id, { sekunden_gesehen: max, max_position_sek: max, prozent: p })
         onFortschritt?.(p)
       } catch {
-        /* Progress will be retried on the next tick */
+        /* Beta: Fortschritt geht beim nächsten Tick erneut raus */
       }
     },
     [laenge, lektion.id, onFortschritt],
   )
 
-  // Persist progress every 10 seconds and again when leaving the lesson
+  // Fortschritt alle 10 Sekunden sichern, außerdem beim Verlassen
   useEffect(() => {
     if (maxPosition - gesendet.current >= 10) {
       gesendet.current = maxPosition
@@ -50,7 +68,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
 
   useEffect(() => () => speichern(position, maxPosition), []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---------------------------------------------------- simulated playback */
+  /* -------------------------------------------------- simulierte Wiedergabe */
   useEffect(() => {
     if (!laeuft || lektion.video_vorhanden) return
     const timer = setInterval(() => {
@@ -64,7 +82,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
     return () => clearInterval(timer)
   }, [laeuft, laenge, lektion.video_vorhanden])
 
-  /* ---------------------------------------------------------- real player */
+  /* ------------------------------------------------------- echter Player */
   function beiZeit(e) {
     const v = e.currentTarget
     const t = v.currentTime
@@ -92,9 +110,14 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
       {lektion.video_vorhanden ? (
         <video
           ref={videoRef}
-          src={`/media/${lektion.video_datei}`}
+          src={streamUrl ?? undefined}
           controls
-          controlsList={vorspulenErlaubt ? undefined : 'nodownload noplaybackrate'}
+          /* Kein Download-Knopf, keine Bild-in-Bild-Auslagerung, kein
+             Kontextmenü mit "Video speichern unter" */
+          controlsList="nodownload noplaybackrate noremoteplayback"
+          disablePictureInPicture
+          disableRemotePlayback
+          onContextMenu={(e) => e.preventDefault()}
           onTimeUpdate={beiZeit}
           onSeeking={beiZeit}
           onPlay={() => setLaeuft(true)}
@@ -106,9 +129,9 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
           style={{ aspectRatio: '16 / 9' }}
         />
       ) : (
-        /* ---------------------------------------------- placeholder player */
+        /* ------------------------------------------ Platzhalter-Wiedergabe */
         <div
-          className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl"
+          className="medien relative flex flex-col items-center justify-center overflow-hidden rounded-2xl"
           style={{
             aspectRatio: '16 / 9',
             background: 'radial-gradient(110% 110% at 20% 0%, #333535 0%, #1c1d1d 55%, #0e0f0f 100%)',
@@ -116,7 +139,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
           }}
         >
           <img
-            src="/brand/mark.svg"
+            src="/brand/bildmarke-weiss.svg"
             alt=""
             aria-hidden="true"
             className="pointer-events-none absolute -right-[10%] bottom-[-25%] w-[55%] opacity-[0.05]"
@@ -126,11 +149,11 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
               className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
               style={{ background: 'color-mix(in srgb, #FFC53A 16%, transparent)', color: '#FFC53A' }}
             >
-              Platzhalter · simulierte Wiedergabe
+              Demo-Video · simulierte Wiedergabe
             </span>
             <button
               className="grid h-16 w-16 place-items-center rounded-full transition hover:scale-105"
-              style={{ background: 'var(--color-akzent)' }}
+              style={{ background: 'var(--color-mis-gruen)' }}
               onClick={() => setLaeuft((l) => !l)}
               aria-label={laeuft ? 'Pause' : 'Wiedergabe starten'}
             >
@@ -140,20 +163,20 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
               <div className="text-sm font-semibold">{lektion.titel}</div>
               <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-faint">
                 <Film size={11} />
-                Für diese Lektion ist keine Videodatei hinterlegt. Die Zeitachse läuft echt mit.
+                Für die Beta ist keine Videodatei hinterlegt. Die Zeitachse läuft echt mit.
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Timeline */}
+      {/* Zeitachse */}
       <div className="space-y-2">
         <div className="relative">
           <ProgressBar prozent={(position / laenge) * 100} hoehe={6} />
           <div
             className="absolute top-0 h-1.5 rounded-full opacity-30"
-            style={{ width: `${(maxPosition / laenge) * 100}%`, background: 'var(--color-akzent)' }}
+            style={{ width: `${(maxPosition / laenge) * 100}%`, background: 'var(--color-mis-gruen)' }}
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-faint">
@@ -172,13 +195,13 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
                   setPosition(neu)
                   setMaxPosition(neu)
                 }}
-                title="Springt eine Minute weiter - nur für Demonstrationen ohne hinterlegte Videodatei."
+                title="Nur in der Beta: springt eine Minute weiter, damit die Vorführung nicht in Echtzeit laufen muss."
               >
                 <FastForward size={13} />
-                Vorspulen: 1 Minute
+                Demo: 1 Minute weiter
               </button>
             )}
-            <span className="font-semibold" style={{ color: prozent >= 95 ? 'var(--color-akzent)' : undefined }}>
+            <span className="font-semibold" style={{ color: prozent >= 95 ? 'var(--color-mis-gruen)' : undefined }}>
               {prozent} % gesehen
             </span>
           </div>
@@ -191,7 +214,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
           Pflichtschulung im Erstdurchlauf: Vorspulen ist gesperrt, mindestens 95 % müssen angesehen werden.
         </p>
       )}
-      {hinweis && <p className="text-[11px]" style={{ color: 'var(--color-status-soon)' }}>{hinweis}</p>}
+      {hinweis && <p className="text-[11px]" style={{ color: 'var(--status-soon-text)' }}>{hinweis}</p>}
     </div>
   )
 }

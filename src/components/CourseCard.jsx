@@ -1,15 +1,21 @@
-﻿import { Bookmark, BookmarkCheck, Clock, PlayCircle } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Clock, PlayCircle } from 'lucide-react'
 import CourseCover from './CourseCover.jsx'
-import { ProgressBar, StatusPill } from './ui.jsx'
-import { akzentFarbe, dauer } from '../lib/format.js'
+import { ProgressBar, StatusPill, KategorieIcon } from './ui.jsx'
+import { akzentFarbe, akzentText, dauer } from '../lib/format.js'
 
-/** Tall shelf-style tile (cover + footer). */
+/**
+ * Farbdisziplin: Rahmen und Flächen bleiben neutral. Die Kategoriefarbe trägt
+ * ausschließlich das Icon - so bleibt eine Wand aus 60 Kursen ruhig, ohne dass
+ * die Zuordnung verloren geht. Einzige Ausnahme ist der rote Rahmen bei
+ * überfälligen Pflichtschulungen: dort ist das Signal gewollt.
+ */
+
+/** Hohe Kachel im Regal-Stil (Cover + Fußzeile). */
 export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
   const farbe = akzentFarbe(kurs.akzent)
   return (
     <article
-      className="group relative flex w-[190px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl transition duration-300 hover:-translate-y-1"
-      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-soft)' }}
+      className="karte group relative flex w-[190px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl hover:-translate-y-1"
       onClick={() => onOeffnen(kurs.slug)}
     >
       <div className="relative">
@@ -17,14 +23,17 @@ export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
         {kurs.pflicht && (
           <span
             className="absolute left-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-            style={{ background: 'color-mix(in srgb, var(--color-akzent) 88%, black)', color: '#fff' }}
+            style={{ background: 'rgba(20,21,21,0.72)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
           >
             Pflicht
           </span>
         )}
         <button
           className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full text-white shadow-lg transition hover:scale-105"
-          style={{ background: kurs.gespeichert ? farbe : 'rgba(20,21,21,0.72)', border: '1px solid rgba(255,255,255,0.18)' }}
+          style={{
+            background: kurs.gespeichert ? farbe : 'rgba(20,21,21,0.72)',
+            border: '1px solid rgba(255,255,255,0.18)',
+          }}
           onClick={(e) => {
             e.stopPropagation()
             onSpeichern(kurs.slug)
@@ -40,7 +49,7 @@ export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
         )}
       </div>
 
-      {/* The title lives on the cover - only duration and status here, no duplication */}
+      {/* Der Titel steht im Cover - hier nur Dauer und Status, damit nichts doppelt erscheint */}
       <div className="flex flex-1 flex-col justify-between gap-2 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-[11px] text-faint">
@@ -48,7 +57,7 @@ export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
             {dauer(kurs.dauer_min)}
           </span>
           {kurs.status === 'laufend' ? (
-            <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: farbe }}>
+            <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: akzentText(kurs.akzent) }}>
               <PlayCircle size={12} />
               {kurs.prozent} %
             </span>
@@ -61,20 +70,27 @@ export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
   )
 }
 
-/** Wide row - used for mandatory courses, saved courses and plain lists. */
+/** Breite Zeile - für Pflichtschulungen, gemerkte Kurse und Listen. */
 export function CourseRow({ kurs, onOeffnen, onSpeichern, zeigeSpeichern = true }) {
   const farbe = akzentFarbe(kurs.akzent)
   const dringend = kurs.status === 'ueberfaellig'
+
   return (
     <article
-      className="group flex cursor-pointer items-center gap-3.5 rounded-2xl p-2.5 transition hover:bg-white/[0.04]"
-      style={{
-        background: dringend ? 'color-mix(in srgb, var(--color-status-late) 8%, transparent)' : 'var(--surface-2)',
-        border: `1px solid ${dringend ? 'color-mix(in srgb, var(--color-status-late) 30%, transparent)' : 'var(--border-soft)'}`,
-      }}
+      className="karte group flex cursor-pointer items-center gap-3.5 rounded-2xl p-2.5"
+      style={
+        dringend
+          ? {
+              // Einziger farbiger Rahmen im System: überfällige Pflichtschulung
+              borderColor: 'color-mix(in srgb, var(--color-status-late) 40%, transparent)',
+              background: 'color-mix(in srgb, var(--color-status-late) 6%, var(--surface-2))',
+            }
+          : undefined
+      }
       onClick={() => onOeffnen(kurs.slug)}
     >
-      <CourseCover kurs={kurs} groesse="sm" className="h-[76px] w-[54px] shrink-0 rounded-lg" />
+      {/* Icon trägt die Kategoriefarbe, sonst nichts */}
+      <KategorieIcon kategorie={kurs.kategorie} akzent={kurs.akzent} pflicht={kurs.pflicht} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">

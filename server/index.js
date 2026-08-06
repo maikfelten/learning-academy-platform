@@ -1,11 +1,11 @@
 /**
- * Local server.
+ * Lokaler Server der Schulungsplattform.
  *
- * Runs without any server framework (node:http only) and serves
- *  - the API under /api
- *  - learning media under /media (with range support for video)
- *  - uploaded proofs under /uploads (own files only, admins see all)
- *  - the built frontend from dist/ (when present)
+ * Läuft ohne externe Server-Bibliothek (nur node:http) und serviert
+ *  - die API unter /api
+ *  - Lernmedien unter /media (mit Range-Unterstützung fürs Video)
+ *  - hochgeladene Nachweise unter /uploads (nur eigene Dateien bzw. Admin)
+ *  - das gebaute Frontend aus dist/ (falls vorhanden)
  */
 
 import { createServer } from 'node:http'
@@ -16,6 +16,7 @@ import * as repo from './repo.js'
 import { MEDIA_DIR, ROOT, UPLOAD_DIR } from './db.js'
 import { seedWennLeer } from './seed.js'
 import { konfiguration } from './config.js'
+import { KOPFZEILEN_SCHUTZ, herkunftErlaubt, streamTokenPruefen } from './stream.js'
 
 const PORT = konfiguration.port
 const COOKIE = 'schulung_session'
@@ -74,8 +75,8 @@ async function body(req) {
   }
 }
 
-/** Serves a file with range support, so video seeking and resuming work. */
-function sendFile(req, res, pfad) {
+/** Datei ausliefern, mit Range-Unterstützung (Video-Sprünge, Wiedereinstieg). */
+function sendFile(req, res, pfad, zusatzKopfzeilen = {}) {
   const stat = statSync(pfad)
   const typ = MIME[extname(pfad).toLowerCase()] ?? 'application/octet-stream'
   const range = req.headers.range
@@ -93,15 +94,21 @@ function sendFile(req, res, pfad) {
       'content-length': bis - von + 1,
       'content-range': `bytes ${von}-${bis}/${stat.size}`,
       'accept-ranges': 'bytes',
+      ...zusatzKopfzeilen,
     })
     return createReadStream(pfad, { start: von, end: bis }).pipe(res)
   }
 
-  res.writeHead(200, { 'content-type': typ, 'content-length': stat.size, 'accept-ranges': 'bytes' })
+  res.writeHead(200, {
+    'content-type': typ,
+    'content-length': stat.size,
+    'accept-ranges': 'bytes',
+    ...zusatzKopfzeilen,
+  })
   createReadStream(pfad).pipe(res)
 }
 
-/** Prevents path traversal (../) out of the exposed directory. */
+/** Verhindert Pfad-Ausbrüche (../) aus dem freigegebenen Ordner. */
 function sicherInnerhalb(basis, relativ) {
   const ziel = resolve(join(basis, normalize(relativ).replace(/^([/\\])+/, '')))
   if (!ziel.startsWith(resolve(basis) + sep) && ziel !== resolve(basis)) return null
@@ -113,6 +120,29 @@ const server = createServer(async (req, res) => {
   const pfad = decodeURIComponent(url.pathname)
 
   try {
+    /* ------------------------------------------------- Geschützter Videostream
+       Muss VOR dem allgemeinen /api-Block stehen: der kennt nur registrierte
+       Routen und würde den Streampfad als unbekannten Endpunkt abweisen. */
+    if (pfad.startsWith('/api/stream/')) {
+      const lessonId = Number(pfad.slice('/api/stream/'.length))
+      const user = repo.sessionUser(cookies(req)[COOKIE] ?? null)
+      if (!user) throw new HttpError(401, 'Bitte melde dich an.')
+      if (!streamTokenPruefen(url.searchParams.get('t'), user.id, lessonId))
+        throw new HttpError(403, 'Der Wiedergabe-Link ist abgelaufen. Bitte die Seite neu laden.')
+      if (!herkunftErlaubt(req))
+        throw new HttpError(403, 'Die Wiedergabe ist nur im eigenen Player möglich.')
+
+      const lektion = repo.lektion(lessonId)
+      if (!lektion) throw new HttpError(404, 'Lektion nicht gefunden.')
+      const kurs = repo.kursById(lektion.course_id)
+      if (!repo.zuweisungenFuer(user).has(kurs.id)) throw new HttpError(403, 'Diese Schulung ist dir nicht zugewiesen.')
+
+      const datei = lektion.typ === 'audio' ? lektion.audio_datei : lektion.video_datei
+      const ziel = datei && sicherInnerhalb(MEDIA_DIR, datei)
+      if (!ziel || !existsSync(ziel)) throw new HttpError(404, 'Datei nicht gefunden.')
+      return sendFile(req, res, ziel, KOPFZEILEN_SCHUTZ)
+    }
+
     /* ------------------------------------------------------------------ API */
     if (pfad.startsWith('/api/')) {
       const treffer = findRoute(req.method, pfad)
@@ -148,19 +178,24 @@ const server = createServer(async (req, res) => {
       return json(res, 200, daten ?? { ok: true })
     }
 
-    /* ----------------------------------------------------------------- Media */
+    /* ---------------------------------------------------------------- Medien
+       Lernmedien ohne Schutzbedarf (PDF, Bilder). Videos laufen bewusst NICHT
+       hierüber, sondern über /api/stream mit Token. */
     if (pfad.startsWith('/media/')) {
-      const ziel = sicherInnerhalb(MEDIA_DIR, pfad.slice('/media/'.length))
+      const relativ = pfad.slice('/media/'.length)
+      if (/\.(mp4|webm|m4v|mp3|m4a|wav)$/i.test(relativ))
+        throw new HttpError(403, 'Mediendateien laufen ausschließlich über den geschützten Player.')
+      const ziel = sicherInnerhalb(MEDIA_DIR, relativ)
       if (!ziel || !existsSync(ziel)) throw new HttpError(404, 'Datei nicht gefunden.')
       return sendFile(req, res, ziel)
     }
 
-    /* ------------------------------------------------------- Uploaded proofs */
+    /* ------------------------------------------------- Hochgeladene Nachweise */
     if (pfad.startsWith('/uploads/')) {
       const user = repo.sessionUser(cookies(req)[COOKIE] ?? null)
       if (!user) throw new HttpError(401, 'Bitte melde dich an.')
       const relativ = pfad.slice('/uploads/'.length)
-      // Every file lives under <user-id>/... - other people's folders: admin only
+      // Jede Datei liegt unter <user-id>/... - fremde Ordner nur für den Admin
       if (user.rolle !== 'admin' && !relativ.startsWith(`${user.id}/`))
         throw new HttpError(403, 'Kein Zugriff auf diesen Nachweis.')
       const ziel = sicherInnerhalb(UPLOAD_DIR, relativ)
@@ -178,11 +213,11 @@ const server = createServer(async (req, res) => {
 
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
     res.end(
-      'The frontend has not been built yet.\nRun "npm run build", or use "npm run dev" for development mode.',
+      'Das Frontend ist noch nicht gebaut.\nBitte "npm run build" ausführen oder im Entwicklungsmodus "npm run dev" nutzen.',
     )
   } catch (fehler) {
     if (fehler instanceof HttpError) return json(res, fehler.status, { fehler: fehler.message, ...fehler.extra })
-    console.error('[server error]', fehler)
+    console.error('[Serverfehler]', fehler)
     return json(res, 500, { fehler: 'Unerwarteter Serverfehler. Details stehen im Serverfenster.' })
   }
 })
@@ -190,6 +225,6 @@ const server = createServer(async (req, res) => {
 await seedWennLeer()
 
 server.listen(PORT, '127.0.0.1', () => {
-  const modus = existsSync(DIST) ? 'serving built frontend' : 'API only, frontend via Vite'
-  console.log(`${konfiguration.plattform} — server running on http://localhost:${PORT}  (${modus})`)
+  const modus = existsSync(DIST) ? 'mit gebautem Frontend' : 'nur API (Frontend über Vite)'
+  console.log(`${konfiguration.plattform} — Server läuft auf http://localhost:${PORT}  (${modus})`)
 })

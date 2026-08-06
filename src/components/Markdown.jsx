@@ -1,8 +1,8 @@
-﻿/**
- * Small markdown renderer for lesson texts.
- * Deliberately limited to what the content needs: headings, lists, tables,
- * quotes, bold and inline code. No third-party library, and no HTML from the
- * text itself - lesson content is never interpreted as HTML.
+/**
+ * Kleiner Markdown-Darsteller für Lektionstexte.
+ * Bewusst nur der Umfang, den die Inhalte brauchen: Überschriften, Listen,
+ * Tabellen, Zitate, fett und Inline-Code. Keine Fremdbibliothek, kein HTML aus
+ * dem Text (Sicherheitsgrund: Inhalte werden nie als HTML interpretiert).
  */
 
 function Inline({ text }) {
@@ -13,13 +13,13 @@ function Inline({ text }) {
   while ((m = regex.exec(text)) !== null) {
     if (m.index > letzter) teile.push(text.slice(letzter, m.index))
     const t = m[0]
-    if (t.startsWith('**')) teile.push(<strong key={m.index} className="font-semibold text-white">{t.slice(2, -2)}</strong>)
+    if (t.startsWith('**')) teile.push(<strong key={m.index} className="font-semibold text-[var(--text-strong)]">{t.slice(2, -2)}</strong>)
     else if (t.startsWith('`'))
       teile.push(
         <code
           key={m.index}
           className="rounded px-1.5 py-0.5 text-[0.9em]"
-          style={{ background: 'color-mix(in srgb, #fff 8%, transparent)' }}
+          style={{ background: 'var(--tint-3)' }}
         >
           {t.slice(1, -1)}
         </code>,
@@ -47,7 +47,7 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Table
+    // Tabelle
     if (zeile.trim().startsWith('|') && zeilen[i + 1]?.includes('---')) {
       const kopf = zeile.split('|').slice(1, -1).map((z) => z.trim())
       i += 2
@@ -79,7 +79,7 @@ export default function Markdown({ text }) {
                     <td
                       key={zi}
                       className="border-b px-3 py-2 align-top text-muted"
-                      style={{ borderColor: 'color-mix(in srgb, #fff 5%, transparent)' }}
+                      style={{ borderColor: 'var(--tint-2)' }}
                     >
                       <Inline text={z} />
                     </td>
@@ -93,7 +93,7 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Headings
+    // Überschriften
     if (zeile.startsWith('### ')) {
       bloecke.push(
         <h4 key={key()} className="mt-5 mb-2 text-sm font-semibold uppercase tracking-wider text-faint">
@@ -105,7 +105,7 @@ export default function Markdown({ text }) {
     }
     if (zeile.startsWith('## ')) {
       bloecke.push(
-        <h3 key={key()} className="mt-6 mb-2.5 text-xl font-semibold tracking-tight text-white">
+        <h3 key={key()} className="mt-6 mb-2.5 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
           {zeile.slice(3)}
         </h3>,
       )
@@ -113,24 +113,27 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Quote / key takeaway
+    // Zitat / Merksatz
     if (zeile.startsWith('> ')) {
       const inhalt = []
       while (i < zeilen.length && zeilen[i].startsWith('> ')) {
         inhalt.push(zeilen[i].slice(2))
         i++
       }
+      // Merksatz als ruhige Fläche mit größerer Schrift statt farbigem
+      // Seitenbalken - der Balken ist ein Aufmerksamkeitsschrei, den der Text
+      // hier nicht braucht, und ein abgenutztes Muster obendrein.
       bloecke.push(
         <blockquote
           key={key()}
-          className="my-4 rounded-r-xl border-l-2 py-3 pl-4 pr-4 text-sm leading-relaxed"
+          className="my-5 rounded-xl px-5 py-4 text-[15px] leading-relaxed"
           style={{
-            borderColor: 'var(--color-akzent)',
-            background: 'color-mix(in srgb, var(--color-akzent) 8%, transparent)',
+            background: 'var(--tint-2)',
+            border: '1px solid var(--border-soft)',
           }}
         >
           {inhalt.map((z, k) => (
-            <p key={k} className={k ? 'mt-1.5' : ''}>
+            <p key={k} className={k ? 'mt-2' : ''}>
               <Inline text={z} />
             </p>
           ))}
@@ -139,7 +142,7 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Ordered list
+    // Nummerierte Liste
     if (/^\d+\.\s/.test(zeile)) {
       const punkte = []
       while (i < zeilen.length && /^\d+\.\s/.test(zeilen[i])) {
@@ -152,7 +155,7 @@ export default function Markdown({ text }) {
             <li key={k} className="flex gap-3 text-sm leading-relaxed text-muted">
               <span
                 className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold"
-                style={{ background: 'color-mix(in srgb, var(--color-akzent) 20%, transparent)', color: 'var(--color-akzent-light)' }}
+                style={{ background: 'color-mix(in srgb, var(--color-mis-gruen) 20%, transparent)', color: 'var(--color-mis-gruen-light)' }}
               >
                 {k + 1}
               </span>
@@ -166,7 +169,7 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Bullet list
+    // Aufzählung
     if (/^[-*]\s/.test(zeile)) {
       const punkte = []
       while (i < zeilen.length && /^[-*]\s/.test(zeilen[i])) {
@@ -177,7 +180,7 @@ export default function Markdown({ text }) {
         <ul key={key()} className="my-3 space-y-1.5">
           {punkte.map((p, k) => (
             <li key={k} className="flex gap-3 text-sm leading-relaxed text-muted">
-              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-akzent)' }} />
+              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-mis-gruen)' }} />
               <span>
                 <Inline text={p} />
               </span>
@@ -188,7 +191,7 @@ export default function Markdown({ text }) {
       continue
     }
 
-    // Paragraph
+    // Absatz
     const absatz = []
     while (i < zeilen.length && zeilen[i].trim() && !/^(#{2,3}\s|[-*]\s|\d+\.\s|>\s|\|)/.test(zeilen[i])) {
       absatz.push(zeilen[i])

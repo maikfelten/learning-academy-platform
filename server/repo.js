@@ -1,13 +1,13 @@
 /**
- * Repository layer: the only place in the project that knows SQL.
- * The interface talks to these functions through server/api.js and nothing else.
- * Moving to another database later means replacing this file - and only this file.
+ * Repository-Schicht: der einzige Ort im Projekt, der SQL kennt.
+ * Die Oberfläche spricht ausschließlich über server/api.js mit diesen Funktionen.
+ * Beim späteren Umzug auf eine echte Datenbank wird nur diese Datei ersetzt.
  */
 
 import { db } from './db.js'
 import { addDays, addHours, addMonths, daysUntil, isPast, nowIso, shuffle, uuid, zertifikatNummer } from './util.js'
 
-/* -------------------------------------------------------------------- People */
+/* ------------------------------------------------------------------ Personen */
 
 export const userByEmail = (email) =>
   db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)').get(String(email || '').trim())
@@ -54,7 +54,7 @@ export function loginErfolg(userId) {
 export function loginFehler(userId) {
   const u = userById(userId)
   const versuche = (u?.fehlversuche ?? 0) + 1
-  // After 5 failed attempts: 15 minutes of lockout - slows down guessing.
+  // Nach 5 Fehlversuchen 15 Minuten Pause - schützt gegen Durchprobieren.
   const gesperrt = versuche >= 5 ? addHours(nowIso(), 0.25) : null
   db.prepare('UPDATE users SET fehlversuche = ?, gesperrt_bis = ? WHERE id = ?').run(versuche, gesperrt, userId)
   return { versuche, gesperrt_bis: gesperrt }
@@ -91,7 +91,7 @@ export const audit = (userId, aktion, objekt = null, details = null) =>
     .prepare('INSERT INTO audit_log (ts, user_id, aktion, objekt, details) VALUES (?,?,?,?,?)')
     .run(nowIso(), userId, aktion, objekt, details ? JSON.stringify(details) : null)
 
-/* ------------------------------------------------------------------- Courses */
+/* -------------------------------------------------------------------- Kurse */
 
 const COURSE_COLS = `id, slug, titel, untertitel, beschreibung, kategorie, anbieter, pflicht,
   turnus_monate, vorwarn_tage, onboarding_frist_tage, strenge, dauer_min, akzent, cover_bild,
@@ -100,13 +100,25 @@ const COURSE_COLS = `id, slug, titel, untertitel, beschreibung, kategorie, anbie
 export const alleKurse = () =>
   db.prepare(`SELECT ${COURSE_COLS} FROM courses WHERE veroeffentlicht = 1 ORDER BY sortierung, titel`).all()
 
-export const kursBySlug = (slug) =>
-  db.prepare(`SELECT ${COURSE_COLS} FROM courses WHERE slug = ? AND veroeffentlicht = 1`).get(slug)
+/** Entwürfe liefert diese Funktion nur, wenn ausdrücklich danach gefragt wird (Admin-Vorschau). */
+export const kursBySlug = (slug, auchEntwuerfe = false) =>
+  db
+    .prepare(`SELECT ${COURSE_COLS} FROM courses WHERE slug = ?${auchEntwuerfe ? '' : ' AND veroeffentlicht = 1'}`)
+    .get(slug)
 
 export const kursById = (id) => db.prepare(`SELECT ${COURSE_COLS} FROM courses WHERE id = ?`).get(id)
 
-export const lektionen = (courseId) =>
-  db.prepare('SELECT * FROM lessons WHERE course_id = ? ORDER BY position').all(courseId)
+/**
+ * Lektionen eines Kurses. Standardmäßig ohne die zurückgehaltenen - sie zählen
+ * damit weder für den Fortschritt noch für den Kursabschluss. Nur die
+ * Adminvorschau fragt mit `nurSichtbare = false` nach der vollen Liste.
+ */
+export const lektionen = (courseId, nurSichtbare = true) =>
+  db
+    .prepare(
+      `SELECT * FROM lessons WHERE course_id = ?${nurSichtbare ? ' AND sichtbar = 1' : ''} ORDER BY position`,
+    )
+    .all(courseId)
 
 export const lektion = (id) => db.prepare('SELECT * FROM lessons WHERE id = ?').get(id)
 
@@ -118,9 +130,9 @@ export const fragenFuerQuiz = (quizId) =>
 export const antwortenFuerFrage = (questionId) =>
   db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY position').all(questionId)
 
-/* --------------------------------------------------------------- Assignments */
+/* --------------------------------------------------------------- Zuweisungen */
 
-/** Resolves all assignment rules down to one concrete person. */
+/** Auflösung der Zuweisungen auf eine konkrete Person. */
 export function zuweisungenFuer(user) {
   const rows = db
     .prepare(
@@ -137,13 +149,13 @@ export function zuweisungenFuer(user) {
   const map = new Map()
   for (const r of rows) {
     const vorher = map.get(r.course_id)
-    // Mandatory beats optional when a person is assigned through several rules.
+    // Pflicht schlägt freiwillig, wenn eine Person über mehrere Wege zugewiesen ist.
     if (!vorher || (!vorher.pflicht && r.pflicht)) map.set(r.course_id, r)
   }
   return map
 }
 
-/* ----------------------------------------------------------- Progress/status */
+/* --------------------------------------------------- Fortschritt und Status */
 
 export const letzterAbschluss = (userId, courseId) =>
   db
@@ -153,6 +165,21 @@ export const letzterAbschluss = (userId, courseId) =>
         ORDER BY abgeschlossen_am DESC LIMIT 1`,
     )
     .get(userId, courseId)
+
+/** Zahl der unterschiedlichen Schulungen, die eine Person abgeschlossen hat. */
+export const abschlussAnzahl = (userId) =>
+  db
+    .prepare('SELECT COUNT(DISTINCT course_id) AS n FROM completions WHERE user_id = ? AND storniert_am IS NULL')
+    .get(userId).n ?? 0
+
+/** Letzter Abschluss einer Person - für die Rangliste. */
+export const letzterAbschlussGesamt = (userId) =>
+  db
+    .prepare(
+      `SELECT c.abgeschlossen_am, k.titel FROM completions c JOIN courses k ON k.id = c.course_id
+        WHERE c.user_id = ? AND c.storniert_am IS NULL ORDER BY c.abgeschlossen_am DESC LIMIT 1`,
+    )
+    .get(userId) ?? null
 
 export const abschluesse = (userId) =>
   db
@@ -182,10 +209,10 @@ const lektionsFortschritt = (userId, courseId) =>
     .all(userId, courseId)
 
 /**
- * Progress of the *current* cycle.
- * Anything completed before the last completion stops counting once that
- * completion expires. That way a refresher cycle can start without deleting old
- * records - the history stays immutable.
+ * Fortschritt des *aktuellen* Durchlaufs.
+ * Alles, was vor dem letzten Abschluss erledigt wurde, zählt nach Ablauf der
+ * Gültigkeit nicht mehr mit - so kann ein Wiederholungszyklus starten, ohne
+ * dass alte Daten gelöscht werden müssen (unveränderliche Historie).
  */
 export function fortschritt(userId, courseId, zyklusStart = null) {
   const alle = lektionen(courseId)
@@ -201,9 +228,8 @@ export function fortschritt(userId, courseId, zyklusStart = null) {
 }
 
 /**
- * Status of one course for one person.
- * bestanden (passed) | bald_faellig (due soon) | ueberfaellig (overdue) |
- * laufend (in progress) | offen (not started)
+ * Status eines Kurses für eine Person.
+ * bestanden | bald_faellig | ueberfaellig | laufend | offen
  */
 export function kursStatus(user, kurs, pflicht = kurs.pflicht) {
   const letzter = letzterAbschluss(user.id, kurs.id)
@@ -273,7 +299,7 @@ export function kursGestartet(userId, courseId) {
   ).run(userId, courseId, jetzt, jetzt)
 }
 
-/* -------------------------------------------------------- Lesson progress */
+/* ------------------------------------------------------- Lektionsfortschritt */
 
 export function fortschrittSpeichern(userId, lessonId, { sekunden_gesehen, max_position_sek, prozent }) {
   const jetzt = nowIso()
@@ -312,8 +338,8 @@ export function lektionAbschliessen(userId, lessonId, { bestaetigt = 1, prozent 
 }
 
 /**
- * Checks after every finished lesson whether the whole course is complete.
- * If so it writes an immutable completion record including its expiry date.
+ * Prüft nach jeder abgeschlossenen Lektion, ob damit der ganze Kurs steht.
+ * Legt dann einen unveränderlichen Abschlusseintrag mit Gültigkeitsdatum an.
  */
 export function kursAbschlussPruefen(user, kurs) {
   const st = kursStatus(user, kurs)
@@ -322,7 +348,7 @@ export function kursAbschlussPruefen(user, kurs) {
   const letzter = letzterAbschluss(user.id, kurs.id)
   if (letzter && (!letzter.gueltig_bis || !isPast(letzter.gueltig_bis))) return letzter // schon gültig abgeschlossen
 
-  // Best quiz result of the current cycle becomes the score of the completion
+  // Bestes Quizergebnis des aktuellen Durchlaufs als Prozentwert des Abschlusses
   const quizLektionen = lektionen(kurs.id).filter((l) => l.typ === 'quiz' && l.quiz_id)
   let prozent = null
   if (quizLektionen.length) {
@@ -345,7 +371,7 @@ export function kursAbschlussPruefen(user, kurs) {
   return db.prepare('SELECT * FROM completions WHERE id = ?').get(Number(info.lastInsertRowid))
 }
 
-/* ---------------------------------------------------------------- Quiz logic */
+/* ---------------------------------------------------------------- Quiz-Logik */
 
 export const versuche = (userId, quizId) =>
   db.prepare('SELECT * FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? ORDER BY gestartet_am DESC').all(userId, quizId)
@@ -364,8 +390,8 @@ const offeneFreischaltung = (userId, quizId) =>
     .get(userId, quizId)
 
 /**
- * Applies the per-quiz attempt rules:
- * cooldown between attempts, maximum attempts per period, hard cap.
+ * Prüft die pro Quiz konfigurierten Versuchsregeln:
+ * Sperrzeit zwischen Versuchen, maximale Versuche pro Zeitraum, harte Obergrenze.
  */
 export function quizStatus(user, quiz, zyklusStart = null) {
   const alle = versuche(user.id, quiz.id)
@@ -403,7 +429,7 @@ export function quizStatus(user, quiz, zyklusStart = null) {
 
   const letzter = beendet[0]
 
-  // 1) Cooldown between two attempts
+  // 1) Sperrzeit zwischen zwei Versuchen
   if (letzter && quiz.sperrzeit_stunden > 0) {
     const frei = addHours(letzter.beendet_am, quiz.sperrzeit_stunden)
     if (!isPast(frei)) {
@@ -413,7 +439,7 @@ export function quizStatus(user, quiz, zyklusStart = null) {
     }
   }
 
-  // 2) Maximum attempts per period
+  // 2) Maximale Versuche pro Zeitraum
   if (result.darf_starten && quiz.max_versuche_zeitraum) {
     const grenze = addDays(nowIso(), -(quiz.zeitraum_tage ?? 7))
     const imZeitraum = beendet.filter((v) => v.beendet_am > grenze)
@@ -426,14 +452,14 @@ export function quizStatus(user, quiz, zyklusStart = null) {
     }
   }
 
-  // 3) Hard cap - only an admin can unlock further attempts
+  // 3) Harte Obergrenze - nur der Admin kann wieder freischalten
   if (result.darf_starten && quiz.harte_obergrenze && imZyklus.length >= quiz.harte_obergrenze) {
     result.darf_starten = false
     result.grund = 'obergrenze'
     result.frei_ab = null
   }
 
-  // An unused admin unlock overrides cooldown, quota and hard cap
+  // Eine offene Freischaltung des Admins hebt Sperrzeit/Kontingent/Obergrenze auf
   if (!result.darf_starten && freischaltung && result.grund !== 'bestanden') {
     result.darf_starten = true
     result.grund = 'freigeschaltet'
@@ -443,7 +469,7 @@ export function quizStatus(user, quiz, zyklusStart = null) {
   return result
 }
 
-/** Draws the questions for an attempt (pool + shuffle) and records the attempt. */
+/** Zieht die Fragen für einen Versuch (Pool + Mischen) und legt den Versuch an. */
 export function versuchStarten(user, quiz, lesson) {
   const laufend = versuche(user.id, quiz.id).find((v) => !v.beendet_am)
   if (laufend) return laufend
@@ -472,7 +498,7 @@ export function versuchStarten(user, quiz, lesson) {
   return db.prepare('SELECT * FROM quiz_attempts WHERE id = ?').get(Number(info.lastInsertRowid))
 }
 
-/** Builds the questions of a running attempt for the interface - without answers. */
+/** Baut die Fragen eines laufenden Versuchs für die Oberfläche auf - ohne Lösungen. */
 export function versuchFragen(versuch) {
   const gezogen = JSON.parse(versuch.fragen_json)
   return gezogen.map((g, i) => {
@@ -494,7 +520,7 @@ export function versuchFragen(versuch) {
   })
 }
 
-/** Grades an attempt. Free-text answers stay open for a human reviewer. */
+/** Bewertet einen Versuch. Freitext bleibt offen und wird vom Admin bewertet. */
 export function versuchAbgeben(user, versuch, quiz, antworten) {
   const gezogen = JSON.parse(versuch.fragen_json)
   let punkte = 0
@@ -547,7 +573,7 @@ export function versuchAbgeben(user, versuch, quiz, antworten) {
   return { prozent, punkte, moeglich, bestanden, freitextOffen, themen: [...falscheThemen] }
 }
 
-/** Full breakdown of correct answers - only after the quiz has been passed. */
+/** Volle Auflösung - nur nach bestandenem Quiz. */
 export function aufloesung(versuch) {
   const gezogen = JSON.parse(versuch.fragen_json)
   const gegeben = versuch.antworten_json ? JSON.parse(versuch.antworten_json) : []
@@ -572,7 +598,7 @@ export function aufloesung(versuch) {
   })
 }
 
-/* ------------------------------ External proofs (third-party providers) */
+/* -------------------------------------- Externe Nachweise (Fremdanbieter) */
 
 export function externenNachweisSpeichern(userId, lesson, { datei_name = null, datei_pfad = null }) {
   const jetzt = nowIso()
@@ -591,7 +617,7 @@ export const externeNachweise = (userId, courseId = null) =>
     ? db.prepare('SELECT * FROM external_proofs WHERE user_id = ? AND course_id = ? ORDER BY bestaetigt_am DESC').all(userId, courseId)
     : db.prepare('SELECT * FROM external_proofs WHERE user_id = ? ORDER BY bestaetigt_am DESC').all(userId)
 
-/* ----------------------------------------------------------------- Curricula */
+/* ------------------------------------------------------------------ Curricula */
 
 export const alleCurricula = () => db.prepare('SELECT * FROM curricula ORDER BY id').all()
 

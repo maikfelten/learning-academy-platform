@@ -1,11 +1,48 @@
-﻿import { AlertTriangle, CheckCircle2, Clock, Loader2, PlayCircle } from 'lucide-react'
-import { STATUS, TON_FARBE, fristText } from '../lib/format.js'
+import {
+  AlertTriangle,
+  BrainCircuit,
+  CheckCircle2,
+  Clock,
+  HardHat,
+  Loader2,
+  PlayCircle,
+  ShieldAlert,
+  Users,
+  Wrench,
+} from 'lucide-react'
+import { STATUS, TON_FARBE, TON_TEXT, akzentFarbe, fristText } from '../lib/format.js'
 
-export function ProgressBar({ prozent, farbe = 'var(--color-akzent)', hoehe = 4, className = '' }) {
+/**
+ * Kategorie-Icon: der einzige Ort, an dem die Kategoriefarbe erscheint.
+ * Alles andere - Rahmen, Flächen, Text - bleibt neutral.
+ */
+const KATEGORIE_ICON = {
+  Pflichtschulungen: ShieldAlert,
+  'KI & Digitales': BrainCircuit,
+  Technik: Wrench,
+  'Sicherheit & Qualität': HardHat,
+  Zusammenarbeit: Users,
+}
+
+export function KategorieIcon({ kategorie, akzent, pflicht, groesse = 18 }) {
+  const Icon = KATEGORIE_ICON[kategorie] ?? (pflicht ? ShieldAlert : BrainCircuit)
+  const farbe = akzentFarbe(akzent)
+  return (
+    <span
+      className="icon-plakette"
+      style={{ width: '2.75rem', height: '2.75rem', background: `color-mix(in srgb, ${farbe} 13%, transparent)`, color: farbe }}
+      title={kategorie}
+    >
+      <Icon size={groesse} strokeWidth={2} />
+    </span>
+  )
+}
+
+export function ProgressBar({ prozent, farbe = 'var(--color-mis-gruen)', hoehe = 4, className = '' }) {
   return (
     <div
       className={`w-full overflow-hidden rounded-full ${className}`}
-      style={{ height: hoehe, background: 'color-mix(in srgb, #ffffff 12%, transparent)' }}
+      style={{ height: hoehe, background: 'var(--tint-3)' }}
       role="progressbar"
       aria-valuenow={prozent}
       aria-valuemin={0}
@@ -29,7 +66,8 @@ const ICON = {
 
 export function StatusPill({ status, tage, klein = false }) {
   const info = STATUS[status] ?? STATUS.offen
-  const farbe = TON_FARBE[info.ton]
+  const flaeche = TON_FARBE[info.ton]
+  const schrift = TON_TEXT[info.ton]
   const Icon = ICON[status]
   const frist = status === 'bald_faellig' || status === 'ueberfaellig' ? fristText(tage) : null
   return (
@@ -38,9 +76,10 @@ export function StatusPill({ status, tage, klein = false }) {
         klein ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
       }`}
       style={{
-        color: farbe,
-        background: `color-mix(in srgb, ${farbe} 16%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${farbe} 35%, transparent)`,
+        // Schrift in der lesbaren Variante, Fläche und Rand in der Hausfarbe
+        color: schrift,
+        background: `color-mix(in srgb, ${flaeche} 14%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${flaeche} 32%, transparent)`,
       }}
     >
       {Icon && <Icon size={klein ? 11 : 13} strokeWidth={2.4} />}
@@ -77,13 +116,13 @@ export function DemoHinweis({ className = '' }) {
       style={{
         background: 'color-mix(in srgb, var(--color-status-soon) 12%, transparent)',
         border: '1px solid color-mix(in srgb, var(--color-status-soon) 32%, transparent)',
-        color: 'color-mix(in srgb, var(--color-status-soon) 88%, white)',
+        color: 'var(--status-soon-text)',
       }}
     >
       <AlertTriangle size={15} className="mt-0.5 shrink-0" />
       <span>
-        <strong className="font-semibold">Beispielinhalt, fachlich nicht geprüft.</strong> Platzhalter zum Ausprobieren
-        — vor dem Produktivbetrieb durch die geprüfte Unterweisung ersetzen.
+        <strong className="font-semibold">Demo-Inhalt, fachlich nicht freigegeben.</strong> Platzhalter für die Beta —
+        wird vor dem Produktivbetrieb durch geprüfte Inhalte ersetzt.
       </span>
     </div>
   )
@@ -97,7 +136,7 @@ export function Fehlermeldung({ text }) {
       style={{
         background: 'color-mix(in srgb, var(--color-status-late) 14%, transparent)',
         border: '1px solid color-mix(in srgb, var(--color-status-late) 38%, transparent)',
-        color: '#ffb3b8',
+        color: 'var(--status-late-text)',
       }}
       role="alert"
     >
