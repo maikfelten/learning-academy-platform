@@ -1,0 +1,15 @@
+node_modules/
+dist/
+
+# Runtime data: the SQLite file and uploaded proofs never belong in the repository
+data/
+
+# Local configuration (template: .env.example)
+.env
+.env.local
+
+# Learning media: videos and PDFs are stored locally, not versioned
+media/
+
+*.log
+.DS_Store

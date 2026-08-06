@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 40" fill="none" role="img" aria-label="Learning Academy">
+  <!-- Platzhalter-Logo. Für den eigenen Einsatz durch das Firmenlogo ersetzen
+       (gleiche Datei, gleiche Höhe von 40 Einheiten). -->
+  <g transform="translate(2 4)">
+    <rect x="0.9" y="0.9" width="30.2" height="30.2" rx="7" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.8" />
+    <g transform="translate(16 16) rotate(45)">
+      <rect x="-9" y="-9" width="18" height="18" fill="#38A446" />
+      <rect x="-4" y="-4" width="8" height="8" fill="#141515" />
+    </g>
+  </g>
+  <text x="44" y="26" font-family="Montserrat, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.3" fill="currentColor">Learning Academy</text>
+</svg>

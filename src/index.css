@@ -1,0 +1,321 @@
+@import 'tailwindcss';
+
+@import '@fontsource/montserrat/300.css';
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+
+/* ---------------------------------------------------------------------------
+   Design-Tokens
+
+   Eine eigene Farbwelt setzt man hier - und nur hier: Grundton (anthrazit),
+   Akzent (gruen) und Ausweichfarbe (blau) austauschen, alles andere zieht nach.
+   Für das dunkle Interface wird der Grundton gegen Schwarz abgedunkelt (ink-*),
+   sonst heben sich Karten nicht vom Hintergrund ab.
+
+   Alle Flächen laufen über semantische Variablen (--surface-*, --text-*), damit
+   ein heller Modus später nur diese Variablen überschreiben muss - kein Neubau.
+   Die Schrift wird über --font-sans getauscht (Paket in package.json anpassen).
+--------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+
+  /* Grundfarben */
+  --color-anthrazit: #535353;
+  --color-anthrazit-75: #7d7d7d;
+  --color-anthrazit-50: #a9a9a9;
+  --color-anthrazit-25: #d4d4d4;
+  --color-hilfsgrau: #f2f2f2;
+  --color-akzent: #38a446;
+  --color-akzent-dark: #277331;
+  --color-akzent-light: #7ec487;
+  --color-info: #00a1ff;
+  --color-info-dark: #0058a6;
+
+  /* Abgedunkelte Anthrazit-Reihe für das dunkle UI */
+  --color-ink-900: #141515;
+  --color-ink-850: #191a1a;
+  --color-ink-800: #1f2020;
+  --color-ink-750: #232525;
+  --color-ink-700: #2b2d2d;
+  --color-ink-600: #363838;
+  --color-ink-500: #454747;
+
+  /* Statusfarben (nur Ampellogik) */
+  --color-status-ok: #38a446;
+  --color-status-soon: #ffc53a;
+  --color-status-late: #e63946;
+  --color-status-info: #00a1ff;
+
+  --radius-panel: 1.25rem;
+}
+
+:root {
+  color-scheme: dark;
+
+  --surface-0: var(--color-ink-850);
+  --surface-1: color-mix(in srgb, var(--color-ink-750) 88%, transparent);
+  --surface-2: color-mix(in srgb, var(--color-ink-700) 90%, transparent);
+  --surface-3: var(--color-ink-600);
+  --surface-hover: color-mix(in srgb, #ffffff 6%, transparent);
+  --border-soft: color-mix(in srgb, #ffffff 9%, transparent);
+  --border-strong: color-mix(in srgb, #ffffff 16%, transparent);
+  --text-strong: #ffffff;
+  --text-muted: color-mix(in srgb, #ffffff 62%, transparent);
+  --text-faint: color-mix(in srgb, #ffffff 40%, transparent);
+  --shadow-panel: 0 24px 60px -20px rgb(0 0 0 / 0.7);
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-strong);
+    font-synthesis-weight: none;
+  }
+
+  /* Hintergrundstimmung: warmes Licht oben links, wie im Vorbild-Layout,
+     aber aus Anthrazit + Grün statt aus Fremdfarben. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(120% 80% at 8% -10%, color-mix(in srgb, var(--color-anthrazit) 55%, transparent) 0%, transparent 60%),
+      radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--color-akzent) 12%, transparent) 0%, transparent 55%),
+      linear-gradient(180deg, var(--color-ink-800) 0%, var(--color-ink-900) 100%);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-akzent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-akzent) 45%, transparent);
+  }
+}
+
+@layer components {
+  /* Glasige Panels - das Signature-Element des Layouts */
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-panel);
+    backdrop-filter: blur(18px) saturate(120%);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .panel-flat {
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 1rem;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 h-11 text-sm font-semibold transition;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--color-akzent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--color-akzent-dark);
+  }
+
+  .btn-light {
+    background: #fff;
+    color: var(--color-ink-900);
+  }
+  .btn-light:hover {
+    background: var(--color-hilfsgrau);
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--border-strong);
+    color: var(--text-strong);
+    background: color-mix(in srgb, #ffffff 4%, transparent);
+  }
+  .btn-ghost:hover {
+    background: var(--surface-hover);
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center rounded-full transition;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--border-strong);
+    background: color-mix(in srgb, #ffffff 4%, transparent);
+    cursor: pointer;
+  }
+  .btn-icon:hover {
+    background: var(--surface-hover);
+  }
+
+  .field {
+    @apply w-full rounded-xl px-4 h-12 text-sm transition;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+  }
+  .field::placeholder {
+    color: var(--text-faint);
+  }
+  .field:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-akzent) 60%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-akzent) 22%, transparent);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wider;
+    border: 1px solid var(--border-soft);
+    background: color-mix(in srgb, #ffffff 6%, transparent);
+    color: var(--text-muted);
+  }
+
+  .tab {
+    @apply rounded-full px-4 h-9 inline-flex items-center text-sm font-medium transition whitespace-nowrap;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .tab:hover {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+  }
+  .tab[data-active='true'] {
+    background: #fff;
+    color: var(--color-ink-900);
+  }
+
+  .rail-btn {
+    @apply relative inline-flex items-center justify-center rounded-2xl transition;
+    width: 2.75rem;
+    height: 2.75rem;
+    color: var(--text-faint);
+    cursor: pointer;
+  }
+  .rail-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+  }
+  .rail-btn[data-active='true'] {
+    background: color-mix(in srgb, #ffffff 10%, transparent);
+    color: #fff;
+  }
+  .rail-btn[data-active='true']::before {
+    content: '';
+    position: absolute;
+    left: -0.9rem;
+    top: 50%;
+    translate: 0 -50%;
+    width: 3px;
+    height: 1.25rem;
+    border-radius: 999px;
+    background: var(--color-akzent);
+  }
+
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-500) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--color-ink-500);
+    border-radius: 999px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer utilities {
+  .text-muted {
+    color: var(--text-muted);
+  }
+  .text-faint {
+    color: var(--text-faint);
+  }
+  .border-soft {
+    border-color: var(--border-soft);
+  }
+
+  /* Bildmarke als dezentes Signature-Muster auf Flächen */
+  .marken-muster {
+    background-image: url('/brand/mark.svg');
+    background-repeat: no-repeat;
+    background-position: 118% 118%;
+    background-size: 78% auto;
+  }
+
+  .animate-rise {
+    animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-fade {
+    animation: fade 0.6s ease both;
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

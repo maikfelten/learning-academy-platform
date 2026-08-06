@@ -1,0 +1,42 @@
+{
+  "name": "learning-academy-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Self-hosted training platform for mandatory workplace training: recurring due dates, configurable quizzes, PDF certificates. Runs locally, no cloud.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "lms",
+    "schulung",
+    "compliance",
+    "unterweisung",
+    "quiz",
+    "training",
+    "sqlite",
+    "react"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "server": "node server/index.js",
+    "client": "vite",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "seed": "node server/seed.js --force"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@fontsource/montserrat": "^5.2.5",
+    "@tailwindcss/vite": "^4.1.4",
+    "@vitejs/plugin-react": "^4.4.1",
+    "lucide-react": "^0.510.0",
+    "tailwindcss": "^4.1.4",
+    "vite": "^6.3.5"
+  }
+}
