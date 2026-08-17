@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { StatusPill } from './ui.jsx'
 import { LevelRing } from './Level.jsx'
-import { themeLesen, themeSetzen } from '../lib/theme.js'
+import { METATASTE, useEscape } from '../lib/tastatur.js'
 
 const RAIL = [
   { key: 'bibliothek', pfad: '/', icon: Home, label: 'Startseite' },
@@ -43,11 +43,13 @@ export default function AppShell({
   aktiverTab,
   setTab,
   hinweise,
+  theme,
+  onTheme,
+  onPalette,
   children,
 }) {
   const [menuOffen, setMenuOffen] = useState(false)
   const [glockeOffen, setGlockeOffen] = useState(false)
-  const [theme, setTheme] = useState(themeLesen)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -61,12 +63,14 @@ export default function AppShell({
     return () => document.removeEventListener('mousedown', klick)
   }, [])
 
+  // Escape schließt jedes offene Menü - dieselbe Taste, überall dieselbe Wirkung
+  useEscape(() => {
+    setMenuOffen(false)
+    setGlockeOffen(false)
+  }, menuOffen || glockeOffen)
+
   const eintraege = RAIL.filter((e) => !e.rollen || e.rollen.includes(user.rolle))
   const offeneHinweise = (hinweise?.ueberfaellig ?? 0) + (hinweise?.bald_faellig ?? 0)
-
-  function themeUmschalten() {
-    setTheme(themeSetzen(theme === 'dunkel' ? 'hell' : 'dunkel'))
-  }
 
   /* Springt auf der Startseite zum Abschnitt Pflichtschulungen. Liegt man
      woanders, wird erst dorthin navigiert und danach gescrollt. */
@@ -130,8 +134,8 @@ export default function AppShell({
                   setSuche(e.target.value)
                   if (aktiv !== 'bibliothek') navigate('/')
                 }}
-                placeholder="Schulungen suchen"
-                aria-label="Schulungen suchen"
+                placeholder="Schulungen filtern"
+                aria-label="Schulungen in der Übersicht filtern"
                 className="field h-10 rounded-full pl-10 text-[13px]"
               />
             </div>
@@ -148,9 +152,25 @@ export default function AppShell({
             {!tabs && <div className="flex-1" />}
 
             <div className="flex items-center gap-2 lg:gap-3" ref={menuRef}>
+              {/* Sprung an jede Stelle der Plattform. Bewusst als eigene
+                  Schaltfläche neben dem Filterfeld: Filtern und Springen sind
+                  zwei verschiedene Absichten und sollen nicht verwechselt
+                  werden. Das Kürzel steht dabei, damit es überhaupt jemand
+                  findet - unsichtbare Kürzel benutzt niemand. */}
+              <button
+                className="btn-icon h-10 gap-1.5 px-3"
+                style={{ width: 'auto' }}
+                onClick={onPalette}
+                aria-label="Suchen und zu einer Schulung oder Seite springen"
+                title={`Suchen und springen (${METATASTE} K)`}
+              >
+                <Search size={15} />
+                <kbd className="taste hidden sm:inline-flex">{METATASTE} K</kbd>
+              </button>
+
               <button
                 className="btn-icon h-10 w-10"
-                onClick={themeUmschalten}
+                onClick={onTheme}
                 aria-label={theme === 'dunkel' ? 'Auf helle Ansicht wechseln' : 'Auf dunkle Ansicht wechseln'}
                 title={theme === 'dunkel' ? 'Helle Ansicht' : 'Dunkle Ansicht'}
               >

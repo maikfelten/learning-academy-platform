@@ -301,9 +301,14 @@ export function kursGestartet(userId, courseId) {
 
 /* ------------------------------------------------------- Lektionsfortschritt */
 
+/** Fortschritt einer Person in einer Lektion - oder undefined, wenn noch keiner da ist. */
+export function lektionFortschritt(userId, lessonId) {
+  return db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(userId, lessonId)
+}
+
 export function fortschrittSpeichern(userId, lessonId, { sekunden_gesehen, max_position_sek, prozent }) {
   const jetzt = nowIso()
-  const vorher = db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(userId, lessonId)
+  const vorher = lektionFortschritt(userId, lessonId)
   const neuMax = Math.max(vorher?.max_position_sek ?? 0, Math.round(max_position_sek ?? 0))
   const neuSek = Math.max(vorher?.sekunden_gesehen ?? 0, Math.round(sekunden_gesehen ?? 0))
   const neuProzent = Math.max(vorher?.prozent ?? 0, Math.round(prozent ?? 0))
@@ -318,12 +323,12 @@ export function fortschrittSpeichern(userId, lessonId, { sekunden_gesehen, max_p
        VALUES (?,?,'laufend',?,?,?,?)`,
     ).run(userId, lessonId, neuSek, neuMax, neuProzent, jetzt)
   }
-  return db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(userId, lessonId)
+  return lektionFortschritt(userId, lessonId)
 }
 
 export function lektionAbschliessen(userId, lessonId, { bestaetigt = 1, prozent = 100 } = {}) {
   const jetzt = nowIso()
-  const vorher = db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(userId, lessonId)
+  const vorher = lektionFortschritt(userId, lessonId)
   if (vorher) {
     db.prepare(
       `UPDATE lesson_progress SET status = 'abgeschlossen', bestaetigt = ?, prozent = ?,

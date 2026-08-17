@@ -48,7 +48,7 @@ export function LevelRing({ level, initialen, groesse = 40, zeigeStufe = true })
         style={{
           width: innen,
           height: innen,
-          background: 'var(--color-mis-gruen-dark)',
+          background: 'var(--color-akzent-dark)',
           color: '#fff',
           fontSize: Math.max(9, groesse * 0.3),
         }}

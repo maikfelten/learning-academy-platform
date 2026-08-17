@@ -87,11 +87,11 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
       <div
         className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"
         style={{
-          background: 'color-mix(in srgb, var(--color-mis-blau) 10%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-mis-blau) 30%, transparent)',
+          background: 'color-mix(in srgb, var(--color-info) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-info) 30%, transparent)',
         }}
       >
-        <ExternalLink size={22} style={{ color: 'var(--color-mis-blau)' }} className="shrink-0" />
+        <ExternalLink size={22} style={{ color: 'var(--color-info)' }} className="shrink-0" />
         <div className="flex-1">
           <h3 className="text-[14px] font-semibold">Diese Schulung läuft beim externen Anbieter</h3>
           <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{lektion.link_hinweis}</p>
@@ -106,7 +106,7 @@ function ExterneLektion({ lektion, onFertig, setFehler }) {
       {nachweis ? (
         <div className="panel-flat space-y-2 p-5">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={17} style={{ color: 'var(--color-mis-gruen)' }} />
+            <CheckCircle2 size={17} style={{ color: 'var(--color-akzent)' }} />
             <h3 className="text-[14px] font-semibold">Teilnahme bestätigt</h3>
           </div>
           <p className="text-[12.5px] text-muted">
@@ -318,11 +318,11 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
         <div
           className="flex flex-col items-center gap-4 rounded-2xl p-6 text-center"
           style={{
-            background: 'color-mix(in srgb, var(--color-mis-gruen) 12%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-mis-gruen) 34%, transparent)',
+            background: 'color-mix(in srgb, var(--color-akzent) 12%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-akzent) 34%, transparent)',
           }}
         >
-          <span className="grid h-14 w-14 place-items-center rounded-full" style={{ background: 'var(--color-mis-gruen)' }}>
+          <span className="grid h-14 w-14 place-items-center rounded-full" style={{ background: 'var(--color-akzent)' }}>
             <Trophy size={26} color="#fff" />
           </span>
           <div>
@@ -370,7 +370,7 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
                   >
                     <span className="shrink-0">
                       {l.erledigt ? (
-                        <CheckCircle2 size={17} style={{ color: 'var(--color-mis-gruen)' }} />
+                        <CheckCircle2 size={17} style={{ color: 'var(--color-akzent)' }} />
                       ) : !l.frei ? (
                         <Lock size={15} className="text-faint" />
                       ) : (
@@ -419,6 +419,8 @@ export default function CoursePage({ slug, navigate, onGeaendert }) {
               lektion={lektion}
               vorspulenErlaubt={kurs.vorspulen_erlaubt || lektion.erledigt}
               onFortschritt={setVideoProzent}
+              akzent={kurs.akzent}
+              motiv={kurs.cover_motiv}
             />
           )}
 

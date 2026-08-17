@@ -20,6 +20,23 @@ const GRUEN = rgb(0x38 / 255, 0xa4 / 255, 0x46 / 255)
 const HELLGRAU = rgb(0xf2 / 255, 0xf2 / 255, 0xf2 / 255)
 const SCHWARZ = rgb(0.1, 0.1, 0.1)
 
+/**
+ * Farbe in Richtung Weiß aufhellen.
+ *
+ * Bewusst als echte Farbe statt über Deckkraft: pdf-lib setzt `borderOpacity`
+ * bei drawSvgPath nicht in einen Transparenzzustand um (im erzeugten PDF steht
+ * dann weder ExtGState noch /CA) - die Form käme in voller Farbe heraus. Auf
+ * weißem Grund ist eine vorab verrechnete Volltonfarbe ohnehin die robustere
+ * Wahl: kein Transparenzobjekt, das ein Drucker oder ein alter Betrachter
+ * unterschiedlich auflöst.
+ */
+const aufgehellt = (farbe, anteil) =>
+  rgb(
+    1 - anteil * (1 - farbe.red),
+    1 - anteil * (1 - farbe.green),
+    1 - anteil * (1 - farbe.blue),
+  )
+
 const datumDe = (iso) =>
   iso ? new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }) : '—'
 
@@ -38,6 +55,17 @@ export async function zertifikatPdf({ abschluss, user }) {
   seite.drawRectangle({ x: 0, y: 0, width, height, color: rgb(1, 1, 1) })
   seite.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: GRUEN })
   seite.drawRectangle({ x: 40, y: 40, width: width - 80, height: height - 100, borderColor: HELLGRAU, borderWidth: 1 })
+
+  /* Winkelmotiv rechts - dieselbe Formensprache wie in der Oberfläche (siehe
+     src/components/Motiv.jsx), damit Zertifikat und Plattform erkennbar
+     zusammengehören.
+     Bewusst sehr blass: Das hier ist ein Nachweis, den Leute abheften und
+     ausdrucken. Er soll Charakter haben, aber weder vom Text ablenken noch
+     unnötig Toner kosten. Wird als Erstes gezeichnet, alles Weitere liegt darüber. */
+  const WINKEL = 'M 0 0 L 60 60 L 0 120'
+  for (const [i, x] of [520, 580, 640].entries()) {
+    seite.drawSvgPath(WINKEL, { x, y: 420, scale: 2, borderColor: aufgehellt(GRUEN, 0.13 - i * 0.035), borderWidth: 15 })
+  }
 
   // Logo
   const logoPfad = join(ROOT, 'public', 'brand', 'logo.png')

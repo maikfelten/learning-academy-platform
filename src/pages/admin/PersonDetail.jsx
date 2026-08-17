@@ -110,11 +110,11 @@ export default function PersonDetail({ id, navigate }) {
         <div
           className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[12.5px]"
           style={{
-            background: 'color-mix(in srgb, var(--color-mis-gruen) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-mis-gruen) 30%, transparent)',
+            background: 'color-mix(in srgb, var(--color-akzent) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-akzent) 30%, transparent)',
           }}
         >
-          <KeyRound size={15} style={{ color: 'var(--color-mis-gruen)' }} />
+          <KeyRound size={15} style={{ color: 'var(--color-akzent)' }} />
           <span className="flex-1">
             Neues Startpasswort: <code className="font-mono font-semibold">{neuesPasswort}</code> — jetzt notieren und
             persönlich übergeben.
@@ -193,7 +193,7 @@ export default function PersonDetail({ id, navigate }) {
                     <span className="min-w-0 flex-1 truncate">{v.titel}</span>
                     <span
                       className="font-semibold"
-                      style={{ color: v.bestanden ? 'var(--color-mis-gruen)' : 'var(--color-status-late)' }}
+                      style={{ color: v.bestanden ? 'var(--color-akzent)' : 'var(--color-status-late)' }}
                     >
                       {v.prozent} %
                     </span>

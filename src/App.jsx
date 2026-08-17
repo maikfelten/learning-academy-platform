@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './lib/api.js'
 import AppShell from './components/AppShell.jsx'
-import { Spinner } from './components/ui.jsx'
+import { RegalSkelett, Spinner } from './components/ui.jsx'
+import { HinweisProvider, useHinweis } from './components/Hinweise.jsx'
+import Befehlspalette from './components/Befehlspalette.jsx'
+import { useTastenkuerzel } from './lib/tastatur.js'
+import { themeLesen, themeSetzen } from './lib/theme.js'
 import LoginPage from './pages/LoginPage.jsx'
 import PasswortWechselPage from './pages/PasswortWechselPage.jsx'
 import LibraryPage from './pages/LibraryPage.jsx'
@@ -27,7 +31,33 @@ const PFAD_ZU_SCHLUESSEL = {
   '/einstellungen': 'einstellungen',
 }
 
+/** Alle Listen der Bibliothek, in denen dieselbe Schulung auftauchen kann. */
+const KURSLISTEN = ['neu', 'weiterlernen', 'pflicht', 'empfehlungen', 'alle']
+
+/**
+ * Merk-Kennzeichen einer Schulung in der bereits geladenen Bibliothek umlegen.
+ *
+ * Dieselbe Schulung steckt in mehreren Listen (Regal, Pflicht, Empfehlungen).
+ * Damit die Anzeige nicht auseinanderläuft, wird sie überall gleichzeitig
+ * umgestellt - ohne dafür die komplette Bibliothek neu zu laden.
+ */
+function merkenUmlegen(daten, slug) {
+  if (!daten) return daten
+  const drehen = (k) => (k && k.slug === slug ? { ...k, gespeichert: !k.gespeichert } : k)
+  const neu = { ...daten, hero: drehen(daten.hero) }
+  for (const liste of KURSLISTEN) if (Array.isArray(daten[liste])) neu[liste] = daten[liste].map(drehen)
+  return neu
+}
+
 export default function App() {
+  return (
+    <HinweisProvider>
+      <AppInhalt />
+    </HinweisProvider>
+  )
+}
+
+function AppInhalt() {
   const [user, setUser] = useState(undefined) // undefined = noch nicht geprüft
   const [pfad, setPfad] = useState(window.location.pathname)
   const [suche, setSuche] = useState('')
@@ -35,6 +65,9 @@ export default function App() {
   const [bibliothek, setBibliothek] = useState(null)
   const [schluessel, setSchluessel] = useState(0)
   const [adminReiter, setAdminReiter] = useState('kurse')
+  const [paletteOffen, setPaletteOffen] = useState(false)
+  const [theme, setTheme] = useState(themeLesen)
+  const hinweis = useHinweis()
 
   /* ------------------------------------------------------------- Anmeldung */
   useEffect(() => {
@@ -78,6 +111,16 @@ export default function App() {
     api.me().then(({ user }) => setUser(user)).catch(() => {})
   }, [])
 
+  /* --------------------------------------------------------- Tastenkürzel */
+  const angemeldet = !!user && !user.passwort_wechsel
+  useTastenkuerzel('k', () => setPaletteOffen(true), { meta: true, aktiv: angemeldet, auchImFeld: true })
+  // Schrägstrich ist der zweite eingebürgerte Weg in die Suche
+  useTastenkuerzel('/', (e) => { e.preventDefault(); setPaletteOffen(true) }, { aktiv: angemeldet })
+
+  function themeUmschalten() {
+    setTheme(themeSetzen(theme === 'dunkel' ? 'hell' : 'dunkel'))
+  }
+
   async function abmelden() {
     await api.logout().catch(() => {})
     setUser(null)
@@ -85,13 +128,30 @@ export default function App() {
     navigate('/')
   }
 
+  /**
+   * Merken: Die Anzeige springt sofort um, der Server zieht nach.
+   *
+   * Warten wir auf die Antwort, fühlt sich jeder Klick träge an. Geht der
+   * Aufruf schief, wird die Änderung zurückgenommen und gesagt, was los ist -
+   * eine stillschweigend verschluckte Fehlermeldung wäre schlimmer als die
+   * kurze Bewegung.
+   */
   async function speichernUmschalten(slug) {
-    await api.speichern(slug).catch(() => {})
-    setSchluessel((s) => s + 1)
+    const vorher = bibliothek
+    const nachher = merkenUmlegen(bibliothek, slug)
+    setBibliothek(nachher)
+    const jetztGemerkt = nachher?.alle?.find((k) => k.slug === slug)?.gespeichert
+    try {
+      await api.speichern(slug)
+      hinweis.erfolg(jetztGemerkt ? 'Zur Merkliste hinzugefügt.' : 'Von der Merkliste entfernt.')
+    } catch (f) {
+      setBibliothek(vorher)
+      hinweis.fehler(f.message ?? 'Das Merken hat nicht geklappt.')
+    }
   }
 
   /* --------------------------------------------------------------- Ansichten */
-  if (user === undefined) return <Spinner label="Schulungsplattform wird geladen …" />
+  if (user === undefined) return <Spinner label="Deine Akademie wird geladen …" />
   if (!user) return <LoginPage onLogin={(u) => { setUser(u); navigate('/') }} />
   if (user.passwort_wechsel)
     return (
@@ -152,7 +212,7 @@ export default function App() {
   } else if (pfad === '/bereich') {
     inhalt = <TeamPage user={user} />
   } else if (!bibliothek) {
-    inhalt = <Spinner label="Deine Schulungen werden geladen …" />
+    inhalt = <RegalSkelett />
   } else {
     inhalt = (
       <LibraryPage
@@ -167,19 +227,35 @@ export default function App() {
   }
 
   return (
-    <AppShell
-      user={user}
-      aktiv={aktiv}
-      navigate={navigate}
-      onLogout={abmelden}
-      suche={suche}
-      setSuche={setSuche}
-      tabs={tabs}
-      aktiverTab={tab}
-      setTab={setTab}
-      hinweise={bibliothek?.hinweise}
-    >
-      {inhalt}
-    </AppShell>
+    <>
+      <AppShell
+        user={user}
+        aktiv={aktiv}
+        navigate={navigate}
+        onLogout={abmelden}
+        suche={suche}
+        setSuche={setSuche}
+        tabs={tabs}
+        aktiverTab={tab}
+        setTab={setTab}
+        hinweise={bibliothek?.hinweise}
+        theme={theme}
+        onTheme={themeUmschalten}
+        onPalette={() => setPaletteOffen(true)}
+      >
+        {inhalt}
+      </AppShell>
+
+      <Befehlspalette
+        offen={paletteOffen}
+        schliessen={() => setPaletteOffen(false)}
+        kurse={bibliothek?.alle ?? []}
+        user={user}
+        navigate={navigate}
+        theme={theme}
+        onTheme={themeUmschalten}
+        onLogout={abmelden}
+      />
+    </>
   )
 }

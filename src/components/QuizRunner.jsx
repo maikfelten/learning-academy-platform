@@ -48,9 +48,9 @@ function Intro({ quiz, onStart, fehler, laeuft }) {
       <div className="flex items-start gap-3">
         <span
           className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
-          style={{ background: 'color-mix(in srgb, var(--color-mis-gruen) 16%, transparent)' }}
+          style={{ background: 'color-mix(in srgb, var(--color-akzent) 16%, transparent)' }}
         >
-          <ClipboardList size={20} style={{ color: 'var(--color-mis-gruen)' }} />
+          <ClipboardList size={20} style={{ color: 'var(--color-akzent)' }} />
         </span>
         <div>
           <h3 className="text-[15px] font-semibold">{quiz.titel}</h3>
@@ -156,15 +156,15 @@ function Frage({ frage, antwort, setAntwort }) {
             onClick={() => umschalten(o.id)}
             className="flex w-full items-start gap-3 rounded-xl px-3.5 py-3 text-left text-[13.5px] transition"
             style={{
-              background: aktiv ? 'color-mix(in srgb, var(--color-mis-gruen) 14%, transparent)' : 'var(--surface-2)',
-              border: `1px solid ${aktiv ? 'color-mix(in srgb, var(--color-mis-gruen) 55%, transparent)' : 'var(--border-soft)'}`,
+              background: aktiv ? 'color-mix(in srgb, var(--color-akzent) 14%, transparent)' : 'var(--surface-2)',
+              border: `1px solid ${aktiv ? 'color-mix(in srgb, var(--color-akzent) 55%, transparent)' : 'var(--border-soft)'}`,
             }}
           >
             <span
               className={`mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center ${mehrfach ? 'rounded-[5px]' : 'rounded-full'}`}
               style={{
-                background: aktiv ? 'var(--color-mis-gruen)' : 'transparent',
-                border: `1.5px solid ${aktiv ? 'var(--color-mis-gruen)' : 'var(--border-strong)'}`,
+                background: aktiv ? 'var(--color-akzent)' : 'transparent',
+                border: `1.5px solid ${aktiv ? 'var(--color-akzent)' : 'var(--border-strong)'}`,
               }}
             >
               {aktiv && <CheckCircle2 size={12} color="#fff" strokeWidth={3} />}
@@ -225,7 +225,7 @@ function Lauf({ versuch, onAbgeben, laeuft }) {
                 className="h-1.5 rounded-full transition-all"
                 style={{
                   width: i === index ? 22 : 12,
-                  background: i === index ? 'var(--color-mis-gruen)' : beantwortet ? 'color-mix(in srgb, var(--color-mis-gruen) 45%, transparent)' : 'var(--color-ink-500)',
+                  background: i === index ? 'var(--color-akzent)' : beantwortet ? 'color-mix(in srgb, var(--color-akzent) 45%, transparent)' : 'var(--color-ink-500)',
                 }}
               />
             )
@@ -296,7 +296,7 @@ function Lauf({ versuch, onAbgeben, laeuft }) {
 function Ergebnis({ ergebnis, quiz, onNochmal, onFertig, onZertifikat }) {
   const bestanden = ergebnis.bestanden
   const offen = ergebnis.bewertung_offen
-  const farbe = bestanden ? 'var(--color-mis-gruen)' : offen ? 'var(--color-status-info)' : 'var(--color-status-late)'
+  const farbe = bestanden ? 'var(--color-akzent)' : offen ? 'var(--color-status-info)' : 'var(--color-status-late)'
 
   return (
     <div className="space-y-4">
@@ -342,11 +342,11 @@ function Ergebnis({ ergebnis, quiz, onNochmal, onFertig, onZertifikat }) {
           <div
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left"
             style={{
-              background: 'color-mix(in srgb, var(--color-mis-gruen) 12%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--color-mis-gruen) 32%, transparent)',
+              background: 'color-mix(in srgb, var(--color-akzent) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--color-akzent) 32%, transparent)',
             }}
           >
-            <FileBadge size={18} style={{ color: 'var(--color-mis-gruen)' }} />
+            <FileBadge size={18} style={{ color: 'var(--color-akzent)' }} />
             <span className="flex-1 text-[12.5px]">
               <strong className="font-semibold">Schulung abgeschlossen.</strong> Dein Nachweis liegt in deinem Profil.
             </span>
@@ -408,7 +408,7 @@ function Ergebnis({ ergebnis, quiz, onNochmal, onFertig, onZertifikat }) {
             {ergebnis.aufloesung.map((a, i) => (
               <div key={i} className="border-b pb-4 last:border-0 last:pb-0" style={{ borderColor: 'var(--border-soft)' }}>
                 <div className="mb-2 flex items-start gap-2">
-                  {a.korrekt === true && <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--color-mis-gruen)' }} />}
+                  {a.korrekt === true && <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--color-akzent)' }} />}
                   {a.korrekt === false && <XCircle size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--color-status-late)' }} />}
                   <span className="text-[13.5px] font-medium">{a.frage}</span>
                 </div>
@@ -424,7 +424,7 @@ function Ergebnis({ ergebnis, quiz, onNochmal, onFertig, onZertifikat }) {
                         className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px]"
                         style={{
                           background: o.korrekt
-                            ? 'color-mix(in srgb, var(--color-mis-gruen) 12%, transparent)'
+                            ? 'color-mix(in srgb, var(--color-akzent) 12%, transparent)'
                             : o.gewaehlt
                               ? 'color-mix(in srgb, var(--color-status-late) 10%, transparent)'
                               : 'transparent',

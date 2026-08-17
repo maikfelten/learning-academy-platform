@@ -31,7 +31,7 @@ function Zielkarte({ ziel, onWert, onLoeschen, darfAendern }) {
     ok: 'var(--color-status-ok)',
     late: 'var(--color-status-late)',
     soon: 'var(--color-status-soon)',
-    neutral: 'var(--color-mis-gruen)',
+    neutral: 'var(--color-akzent)',
   }[ton]
   const textFarbe = {
     ok: 'var(--status-ok-text)',
@@ -267,7 +267,7 @@ function MeineSicht({ daten, neuLaden, setFehler }) {
                         style={{
                           background:
                             s < k.ist
-                              ? 'var(--color-mis-gruen)'
+                              ? 'var(--color-akzent)'
                               : k.soll != null && s < k.soll
                                 ? 'color-mix(in srgb, var(--color-status-soon) 55%, transparent)'
                                 : 'var(--tint-3)',
@@ -340,7 +340,7 @@ function MeineSicht({ daten, neuLaden, setFehler }) {
                     className="grid h-8 w-8 place-items-center rounded-lg text-[12px] font-semibold transition"
                     style={
                       umfrage[frage] === w
-                        ? { background: 'var(--color-mis-gruen)', color: '#fff' }
+                        ? { background: 'var(--color-akzent)', color: '#fff' }
                         : { background: 'var(--tint-2)', color: 'var(--text-faint)' }
                     }
                     title={['trifft nicht zu', 'eher nicht', 'teils', 'eher ja', 'trifft voll zu'][w - 1]}
@@ -676,7 +676,7 @@ function PersonSicht({ id, navigate, setFehler }) {
                       className="grid h-6 w-6 place-items-center rounded text-[10px] font-semibold transition"
                       style={
                         k.ist === s
-                          ? { background: 'var(--color-mis-gruen)', color: '#fff' }
+                          ? { background: 'var(--color-akzent)', color: '#fff' }
                           : { background: 'var(--tint-2)', color: 'var(--text-faint)' }
                       }
                       title={STUFEN_TEXT[s]}

@@ -1,5 +1,5 @@
 /**
- * API der Plattform. Kennt kein SQL - alles läuft über server/repo.js.
+ * API der Schulungsplattform. Kennt kein SQL - alles läuft über server/repo.js.
  * Rollen: admin (alles), fuehrungskraft (lesend, eigener Bereich), lernender.
  */
 
@@ -7,13 +7,14 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import * as repo from './repo.js'
 import { hashPassword, passwortRegelnPruefen, verifyPassword } from './auth.js'
-import { MEDIA_DIR, UPLOAD_DIR, db } from './db.js'
+import { MEDIA_DIR, UPLOAD_DIR } from './db.js'
 import { isPast, nowIso, safeFileName } from './util.js'
 import { zertifikatPdf } from './certificate.js'
 import { levelBerechnen } from './level.js'
 import { konfiguration, oeffentlicheKonfiguration } from './config.js'
 import * as admin from './admin.js'
 import * as performance from './performance.js'
+import * as repoPerformance from './repo-performance.js'
 import { streamTokenErzeugen } from './stream.js'
 
 export class HttpError extends Error {
@@ -238,7 +239,7 @@ export function findRoute(method, pfad) {
 /* ------------------------------------------------------------------- Zugang */
 
 // Name der Plattform, Organisation und Support-Adresse - schon vor der Anmeldung
-// gebraucht (Login), enthält deshalb bewusst nichts Internes.
+// gebraucht (Login), enthaelt deshalb bewusst nichts Internes.
 route('GET', '/api/info', () => oeffentlicheKonfiguration(), { oeffentlich: true })
 
 route(
@@ -351,7 +352,7 @@ route('POST', '/api/lektionen/:id/abschliessen', ({ user, params, body }) => {
   const { lektion, kurs, pflicht } = lektionKontext(user, params.id)
 
   if (['video', 'youtube'].includes(lektion.typ) && kurs.strenge === 'streng') {
-    const p = db.prepare('SELECT * FROM lesson_progress WHERE user_id = ? AND lesson_id = ?').get(user.id, lektion.id)
+    const p = repo.lektionFortschritt(user.id, lektion.id)
     const st = repo.kursStatus(user, kurs, pflicht)
     // 95-Prozent-Regel gilt nur beim Erstdurchlauf strenger Kurse
     if (!st.wiederholung && (p?.prozent ?? 0) < 95)
@@ -849,7 +850,7 @@ route(
 )
 
 route('PUT', '/api/performance/ziele/:id', ({ user, params, body }) => {
-  const ziel = db.prepare('SELECT * FROM goals WHERE id = ?').get(Number(params.id))
+  const ziel = repoPerformance.ziel(params.id)
   if (!ziel) throw new HttpError(404, 'Ziel nicht gefunden.')
   // Den Istwert darf die Person selbst pflegen, alles andere nur die Führung
   const nurIstwert = Object.keys(body ?? {}).every((k) => ['istwert', 'kommentar'].includes(k))
@@ -865,7 +866,7 @@ route(
   'DELETE',
   '/api/performance/ziele/:id',
   ({ user, params }) => {
-    const ziel = db.prepare('SELECT * FROM goals WHERE id = ?').get(Number(params.id))
+    const ziel = repoPerformance.ziel(params.id)
     if (!ziel) throw new HttpError(404, 'Ziel nicht gefunden.')
     if (!performanceZugriff(user, ziel.user_id, true)) throw new HttpError(403, 'Kein Zugriff auf dieses Ziel.')
     performance.zielLoeschen(Number(params.id))
@@ -888,7 +889,7 @@ route(
 )
 
 route('PUT', '/api/performance/reviews/:id', ({ user, params, body }) => {
-  const review = db.prepare('SELECT * FROM reviews WHERE id = ?').get(Number(params.id))
+  const review = repoPerformance.review(params.id)
   if (!review) throw new HttpError(404, 'Review nicht gefunden.')
   // Die eigene Selbsteinschätzung darf man schreiben, die Bewertung nicht
   const nurSelbst = Object.keys(body ?? {}).every((k) => ['selbst_text', 'status'].includes(k)) && body.status !== 'abgeschlossen'

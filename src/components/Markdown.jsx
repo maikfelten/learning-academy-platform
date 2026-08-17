@@ -155,7 +155,7 @@ export default function Markdown({ text }) {
             <li key={k} className="flex gap-3 text-sm leading-relaxed text-muted">
               <span
                 className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold"
-                style={{ background: 'color-mix(in srgb, var(--color-mis-gruen) 20%, transparent)', color: 'var(--color-mis-gruen-light)' }}
+                style={{ background: 'color-mix(in srgb, var(--color-akzent) 20%, transparent)', color: 'var(--color-akzent-light)' }}
               >
                 {k + 1}
               </span>
@@ -180,7 +180,7 @@ export default function Markdown({ text }) {
         <ul key={key()} className="my-3 space-y-1.5">
           {punkte.map((p, k) => (
             <li key={k} className="flex gap-3 text-sm leading-relaxed text-muted">
-              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-mis-gruen)' }} />
+              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-akzent)' }} />
               <span>
                 <Inline text={p} />
               </span>

@@ -24,7 +24,8 @@
     "client": "vite",
     "build": "vite build",
     "start": "node server/index.js",
-    "seed": "node server/seed.js --force"
+    "seed": "node server/seed.js --force",
+    "pruefen": "node scripts/datenzugriff-pruefen.js"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

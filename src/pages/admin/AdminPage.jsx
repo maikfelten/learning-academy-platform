@@ -270,11 +270,11 @@ function PersonenVerwaltung({ navigate }) {
         <div
           className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[12.5px]"
           style={{
-            background: 'color-mix(in srgb, var(--color-mis-gruen) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-mis-gruen) 30%, transparent)',
+            background: 'color-mix(in srgb, var(--color-akzent) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-akzent) 30%, transparent)',
           }}
         >
-          <KeyRound size={15} style={{ color: 'var(--color-mis-gruen)' }} />
+          <KeyRound size={15} style={{ color: 'var(--color-akzent)' }} />
           <span className="flex-1">
             Neues Startpasswort für <strong>{neuesPasswort.name}</strong>:{' '}
             <code className="font-mono">{neuesPasswort.passwort}</code> — beim ersten Login wird es gewechselt.
@@ -354,7 +354,7 @@ function PersonenVerwaltung({ navigate }) {
               <ProgressBar
                 prozent={p.pflicht_gesamt ? (p.pflicht_erfuellt / p.pflicht_gesamt) * 100 : 100}
                 hoehe={4}
-                farbe={p.ueberfaellig ? 'var(--color-status-late)' : 'var(--color-mis-gruen)'}
+                farbe={p.ueberfaellig ? 'var(--color-status-late)' : 'var(--color-akzent)'}
               />
             </div>
 

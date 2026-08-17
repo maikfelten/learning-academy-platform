@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import CourseCover from '../components/CourseCover.jsx'
+import Motiv from '../components/Motiv.jsx'
 import { CourseCard, CourseRow } from '../components/CourseCard.jsx'
 import { ProgressBar, SectionHeader } from '../components/ui.jsx'
 import { akzentFarbe, dauer, relativeZeit } from '../lib/format.js'
@@ -34,11 +35,19 @@ function Hero({ kurse, index, setIndex, onOeffnen, onSpeichern }) {
         border: '1px solid rgba(255,255,255,0.10)',
       }}
     >
-      <img
-        src="/brand/bildmarke-weiss.svg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-[30%] right-[-6%] w-[62%] opacity-[0.05]"
+      {/* Dasselbe Motiv wie auf dem Cover der Schulung, nur im Querformat -
+          dadurch erkennt man den Hero als Vergrößerung derselben Sache wieder. */}
+      <Motiv
+        art={kurs.cover_motiv ?? 'winkel'}
+        farbe={farbe}
+        format="quer"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+      />
+
+      {/* Textseite abdunkeln, damit Überschrift und Fließtext ruhig stehen */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'linear-gradient(100deg, rgba(15,16,16,0.90) 0%, rgba(15,16,16,0.55) 38%, transparent 68%)' }}
       />
 
       <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:gap-10 lg:p-10">
@@ -235,9 +244,13 @@ export default function LibraryPage({ daten, suche, tab, onOeffnen, onSpeichern,
             Dazu gibt es keine Schulung. Fehlt etwas? Sag es der Schulungsleitung.
           </div>
         )}
-        <div className="space-y-2">
+
+        {/* Raster statt Liste: Eine Zeilenliste zwingt zum Lesen, bevor man
+            wählen kann. Als Kachelwand erkennt man Cover, Kategorie und Status
+            auf einen Blick, und die ganze Kachel ist das Klickziel. */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {liste.map((k) => (
-            <CourseRow key={k.slug} kurs={k} onOeffnen={onOeffnen} onSpeichern={onSpeichern} />
+            <CourseCard key={k.slug} kurs={k} onOeffnen={onOeffnen} onSpeichern={onSpeichern} fluid />
           ))}
         </div>
       </div>

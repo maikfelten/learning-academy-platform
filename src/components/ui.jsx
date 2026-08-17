@@ -38,7 +38,7 @@ export function KategorieIcon({ kategorie, akzent, pflicht, groesse = 18 }) {
   )
 }
 
-export function ProgressBar({ prozent, farbe = 'var(--color-mis-gruen)', hoehe = 4, className = '' }) {
+export function ProgressBar({ prozent, farbe = 'var(--color-akzent)', hoehe = 4, className = '' }) {
   return (
     <div
       className={`w-full overflow-hidden rounded-full ${className}`}
@@ -105,6 +105,50 @@ export function Spinner({ label = 'Lädt …' }) {
     <div className="flex items-center justify-center gap-2 py-16 text-sm text-faint">
       <Loader2 size={16} className="animate-spin" />
       {label}
+    </div>
+  )
+}
+
+/**
+ * Ladeplatzhalter in der Form dessen, was gleich kommt.
+ *
+ * Ein Kreisel sagt nur "warte"; danach springt das fertige Layout ins Bild.
+ * Der Platzhalter nimmt den Raum vorher ein, sodass beim Eintreffen der Daten
+ * nichts mehr verrutscht - der Wechsel fällt kaum auf.
+ */
+export function RegalSkelett() {
+  return (
+    <div className="animate-fade flex flex-col gap-4 xl:flex-row" aria-hidden="true">
+      <aside className="order-2 w-full shrink-0 space-y-3.5 xl:order-1 xl:w-[262px]">
+        {[0, 1].map((i) => (
+          <div key={i} className="panel-flat space-y-3 p-3.5">
+            <div className="skelett h-3.5 w-1/2" />
+            {[0, 1, 2].map((z) => (
+              <div key={z} className="flex items-center gap-2.5">
+                <div className="skelett h-[44px] w-[32px] shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="skelett h-3 w-4/5" />
+                  <div className="skelett h-2.5 w-2/5" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </aside>
+
+      <div className="order-1 min-w-0 flex-1 space-y-4 xl:order-2">
+        <div className="skelett h-[290px] w-full rounded-3xl" />
+        <div className="skelett h-4 w-40" />
+        <div className="flex gap-3.5 overflow-hidden">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="w-[188px] shrink-0 space-y-2">
+              <div className="skelett h-[268px] w-full rounded-xl" />
+              <div className="skelett h-3 w-3/4" />
+              <div className="skelett h-2.5 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

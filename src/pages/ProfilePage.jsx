@@ -44,10 +44,10 @@ function NachweisZeile({ n }) {
         style={{
           background: n.abgelaufen
             ? 'color-mix(in srgb, var(--color-status-late) 14%, transparent)'
-            : 'color-mix(in srgb, var(--color-mis-gruen) 14%, transparent)',
+            : 'color-mix(in srgb, var(--color-akzent) 14%, transparent)',
         }}
       >
-        <FileBadge size={17} style={{ color: n.abgelaufen ? 'var(--color-status-late)' : 'var(--color-mis-gruen)' }} />
+        <FileBadge size={17} style={{ color: n.abgelaufen ? 'var(--color-status-late)' : 'var(--color-akzent)' }} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -128,8 +128,8 @@ export default function ProfilePage({ user, schluessel, onOeffnen, onSpeichern }
 
       {/* Kennzahlen */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kennzahl icon={CheckCircle2} wert={s.abgeschlossen} label="gültige Abschlüsse" farbe="var(--color-mis-gruen)" />
-        <Kennzahl icon={GraduationCap} wert={daten.laufend.length} label="Schulungen in Arbeit" farbe="var(--color-mis-blau)" />
+        <Kennzahl icon={CheckCircle2} wert={s.abgeschlossen} label="gültige Abschlüsse" farbe="var(--color-akzent)" />
+        <Kennzahl icon={GraduationCap} wert={daten.laufend.length} label="Schulungen in Arbeit" farbe="var(--color-info)" />
         <Kennzahl icon={Timer} wert={dauer(s.lernminuten)} label="absolvierte Lernzeit" farbe="var(--color-anthrazit-50)" />
         <Kennzahl
           icon={Clock3}

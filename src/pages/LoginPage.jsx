@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, GraduationCap, Info, LogIn, ShieldCheck, UserRound } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { Fehlermeldung } from '../components/ui.jsx'
+import Motiv from '../components/Motiv.jsx'
 
 const SCHRITTE = [
   { nummer: 1, titel: 'Anmelden', text: 'Mit dem Zugang, den du von der Schulungsleitung bekommen hast.' },
@@ -72,15 +73,22 @@ export default function LoginPage({ onLogin }) {
             'radial-gradient(120% 90% at 10% 0%, #4a4c4c 0%, #2b2d2d 45%, #141515 100%)',
         }}
       >
-        <img
-          src="/brand/bildmarke-weiss.svg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-[18%] top-[8%] w-[92%] opacity-[0.045]"
+        {/* Dieselbe Formensprache wie auf den Kurscovern - der Anmeldebildschirm
+            ist die erste Fläche, die jemand sieht, und soll erkennbar zur
+            Plattform gehören. Beschnitten statt gezogen: die Spalte ist je nach
+            Fenster mal breiter, mal schmaler als der Entwurf. */}
+        <Motiv
+          art="winkel"
+          farbe="#38A446"
+          beschneiden
+          className="pointer-events-none absolute inset-0 h-full w-full"
         />
+
+        {/* Die Schritte unten stehen auf hellen Kacheln - darunter etwas
+            abdunkeln, damit das Motiv nicht durch sie hindurchzublitzen scheint. */}
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2"
-          style={{ background: 'linear-gradient(to top, rgba(56,164,70,0.10), transparent)' }}
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'linear-gradient(to top, rgba(15,16,16,0.80) 0%, rgba(15,16,16,0.58) 50%, rgba(15,16,16,0.38) 100%)' }}
         />
 
         <div className="relative z-10 w-full max-w-sm space-y-8">
@@ -96,7 +104,7 @@ export default function LoginPage({ onLogin }) {
               <br />
               nachweisbar ist.
             </h1>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/55">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/75">
               Schulungsplattform für Pflichtschulungen, Fachwissen und Nachweise an einem Ort.
             </p>
           </div>
@@ -109,7 +117,7 @@ export default function LoginPage({ onLogin }) {
             ))}
           </div>
 
-          <div className="animate-rise flex items-center gap-2 text-[11px] text-white/35" style={{ animationDelay: '460ms' }}>
+          <div className="animate-rise flex items-center gap-2 text-[11px] text-white/60" style={{ animationDelay: '460ms' }}>
             <ShieldCheck size={13} />
             Zugänge werden ausschließlich von der Schulungsleitung angelegt.
           </div>
@@ -176,7 +184,7 @@ export default function LoginPage({ onLogin }) {
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-faint">
-                Passwort vergessen? Die Schulungsleitung setzt es zurück — <span className="text-muted">it@mis-gruppe.com</span>
+                Passwort vergessen? Die Schulungsleitung setzt es zurück — <span className="text-muted">it@example.com</span>
               </p>
             </div>
 

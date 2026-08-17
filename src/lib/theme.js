@@ -7,7 +7,7 @@
  * ist - die Plattform wird überwiegend in hellen Werkhallen und Büros benutzt).
  */
 
-const SCHLUESSEL = 'mis-akademie-theme'
+const SCHLUESSEL = 'akademie-theme'
 export const THEMES = ['hell', 'dunkel']
 
 export function themeLesen() {

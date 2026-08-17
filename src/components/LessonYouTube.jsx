@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, Info } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { ProgressBar } from './ui.jsx'
+import { youtubeEinbettung, youtubeIdAus, youtubeSeite } from '../../shared/youtube.js'
 
 /**
  * YouTube-Lektion.
@@ -17,22 +18,9 @@ import { ProgressBar } from './ui.jsx'
  * die Plattform - dann greift die echte 95-Prozent-Messung.
  */
 
-/** Zieht die Video-ID aus jeder gängigen YouTube-Adresse. */
-export function youtubeIdAus(eingabe = '') {
-  const text = String(eingabe).trim()
-  if (/^[\w-]{11}$/.test(text)) return text
-  const muster = [
-    /[?&]v=([\w-]{11})/,
-    /youtu\.be\/([\w-]{11})/,
-    /youtube\.com\/embed\/([\w-]{11})/,
-    /youtube\.com\/shorts\/([\w-]{11})/,
-  ]
-  for (const m of muster) {
-    const treffer = text.match(m)
-    if (treffer) return treffer[1]
-  }
-  return null
-}
+// Weiterhin von hier exportiert, damit der Kurs-Editor seinen Import behält -
+// die Umsetzung liegt jetzt gemeinsam mit dem Server in shared/youtube.js.
+export { youtubeIdAus }
 
 export default function LessonYouTube({ lektion, onFortschritt }) {
   const sollSekunden = Math.max(60, (lektion.dauer_min || 5) * 60)
@@ -68,7 +56,7 @@ export default function LessonYouTube({ lektion, onFortschritt }) {
     <div className="space-y-3">
       <div className="overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: '16 / 9' }}>
         <iframe
-          src={`https://www.youtube-nocookie.com/embed/${lektion.youtube_id}?rel=0&modestbranding=1`}
+          src={youtubeEinbettung(lektion.youtube_id)}
           title={lektion.titel}
           allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
@@ -86,7 +74,7 @@ export default function LessonYouTube({ lektion, onFortschritt }) {
             Angesetzte Länge {lektion.dauer_min} min · {prozent} % erfasst
           </span>
           <a
-            href={`https://www.youtube.com/watch?v=${lektion.youtube_id}`}
+            href={youtubeSeite(lektion.youtube_id)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 transition hover:text-[var(--text-strong)]"

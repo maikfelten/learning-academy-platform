@@ -65,15 +65,15 @@ function Benachrichtigungen({ setFehler }) {
             key={k.key}
             onClick={() => aendern({ [k.key]: !e[k.key] })}
             className="karte flex items-start gap-2.5 rounded-xl p-3 text-left"
-            style={e[k.key] ? { borderColor: 'color-mix(in srgb, var(--color-mis-gruen) 45%, transparent)' } : undefined}
+            style={e[k.key] ? { borderColor: 'color-mix(in srgb, var(--color-akzent) 45%, transparent)' } : undefined}
           >
             <span
               className="icon-plakette"
               style={{
                 width: '1.9rem',
                 height: '1.9rem',
-                background: e[k.key] ? 'color-mix(in srgb, var(--color-mis-gruen) 15%, transparent)' : 'var(--tint-2)',
-                color: e[k.key] ? 'var(--color-mis-gruen)' : 'var(--text-faint)',
+                background: e[k.key] ? 'color-mix(in srgb, var(--color-akzent) 15%, transparent)' : 'var(--tint-2)',
+                color: e[k.key] ? 'var(--color-akzent)' : 'var(--text-faint)',
               }}
             >
               <k.icon size={14} />
@@ -256,7 +256,7 @@ export default function SettingsPage({ user }) {
             ['Heller Anzeigemodus', 'die Farben liegen als Tokens vor, ein Hell-Modus ist nachrüstbar ohne Neubau.'],
           ].map(([t, b]) => (
             <li key={t} className="flex gap-2.5">
-              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-mis-gruen)' }} />
+              <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--color-akzent)' }} />
               <span>
                 <strong className="font-semibold text-[var(--text-strong)]">{t}</strong> — {b}
               </span>

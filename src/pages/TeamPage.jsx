@@ -49,7 +49,7 @@ export default function TeamPage({ user }) {
         <div className="panel-flat p-4">
           <div className="text-[11.5px] text-faint">Personen mit Überfälligkeiten</div>
           <div className="mt-1.5 flex items-center gap-2">
-            <AlertTriangle size={20} style={{ color: daten.ueberfaellige_personen ? 'var(--color-status-late)' : 'var(--color-mis-gruen)' }} />
+            <AlertTriangle size={20} style={{ color: daten.ueberfaellige_personen ? 'var(--color-status-late)' : 'var(--color-akzent)' }} />
             <span className="text-3xl font-semibold leading-none">{daten.ueberfaellige_personen}</span>
           </div>
           <p className="mt-2.5 text-[11px] text-faint">von {daten.zeilen.length} Personen im Bereich</p>
@@ -111,7 +111,7 @@ export default function TeamPage({ user }) {
                     <td className="border-b px-3.5 py-2.5" style={{ borderColor: 'var(--tint-2)', minWidth: 120 }}>
                       <div className="flex items-center gap-2">
                         <span className="w-[92px]">
-                          <ProgressBar prozent={quote} hoehe={5} farbe={z.ueberfaellig ? 'var(--color-status-late)' : 'var(--color-mis-gruen)'} />
+                          <ProgressBar prozent={quote} hoehe={5} farbe={z.ueberfaellig ? 'var(--color-status-late)' : 'var(--color-akzent)'} />
                         </span>
                         <span className="text-[11px] text-faint">{quote} %</span>
                       </div>

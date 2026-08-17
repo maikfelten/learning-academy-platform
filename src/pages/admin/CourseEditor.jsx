@@ -510,7 +510,7 @@ export default function CourseEditor({ slug, navigate }) {
                   className="karte rounded-xl"
                   style={{
                     opacity: l.sichtbar === false ? 0.55 : 1,
-                    borderColor: ueber === i ? 'var(--color-mis-gruen)' : undefined,
+                    borderColor: ueber === i ? 'var(--color-akzent)' : undefined,
                     borderStyle: ueber === i ? 'dashed' : 'solid',
                   }}
                 >

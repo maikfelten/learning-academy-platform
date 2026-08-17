@@ -16,10 +16,10 @@
  * einer Mindestgruppengröße - sonst ist "anonym" ein leeres Versprechen.
  */
 
-import { db } from './db.js'
 import * as repo from './repo.js'
-import { addDays, daysUntil, isPast, nowIso } from './util.js'
+import * as speicher from './repo-performance.js'
 import { konfiguration } from './config.js'
+import { daysUntil, isPast } from './util.js'
 
 /** Unter dieser Gruppengröße wird kein Stimmungsbild ausgewiesen. */
 export const MINDESTGRUPPE = 4
@@ -58,72 +58,30 @@ function zielAnreichern(ziel, user) {
 
 export function zieleFuer(userId) {
   const user = repo.userById(userId)
-  return db
-    .prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY faellig_am')
-    .all(userId)
-    .map((z) => zielAnreichern(z, user))
+  return speicher.zieleVon(userId).map((z) => zielAnreichern(z, user))
 }
 
-export function zielAnlegen(daten, erstellerId) {
-  const info = db
-    .prepare(
-      `INSERT INTO goals (user_id, titel, beschreibung, art, einheit, startwert, zielwert, istwert,
-                          faellig_am, gewichtung, course_id, erstellt_von, erstellt_am)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    )
-    .run(
-      daten.user_id,
-      daten.titel,
-      daten.beschreibung ?? null,
-      daten.art ?? 'messbar',
-      daten.einheit ?? null,
-      Number(daten.startwert) || 0,
-      Number(daten.zielwert) || 100,
-      Number(daten.istwert) || 0,
-      daten.faellig_am,
-      Number(daten.gewichtung) || 1,
-      daten.course_id ?? null,
-      erstellerId,
-      nowIso(),
-    )
-  return Number(info.lastInsertRowid)
-}
+export const zielAnlegen = (daten, erstellerId) => speicher.zielAnlegen(daten, erstellerId)
 
 export function zielAktualisieren(id, daten, vonUser) {
-  const ziel = db.prepare('SELECT * FROM goals WHERE id = ?').get(id)
-  if (!ziel) return null
+  if (!speicher.ziel(id)) return null
 
-  const felder = ['titel', 'beschreibung', 'art', 'einheit', 'startwert', 'zielwert', 'istwert', 'faellig_am', 'gewichtung', 'course_id', 'status'].filter(
-    (f) => f in daten,
-  )
-  if (felder.length) {
-    const satz = felder.map((f) => `${f} = ?`).join(', ')
-    db.prepare(`UPDATE goals SET ${satz} WHERE id = ?`).run(...felder.map((f) => daten[f]), id)
-  }
+  speicher.zielSchreiben(id, daten)
 
   // Jede Wertänderung wird protokolliert - Zielverschiebungen sollen sichtbar bleiben
-  if ('istwert' in daten) {
-    db.prepare('INSERT INTO goal_updates (goal_id, wert, kommentar, von_user, erstellt_am) VALUES (?,?,?,?,?)').run(
-      id,
-      Number(daten.istwert),
-      daten.kommentar ?? null,
-      vonUser,
-      nowIso(),
-    )
-  }
+  if ('istwert' in daten) speicher.zielVerlaufAnlegen(id, daten.istwert, daten.kommentar, vonUser)
 
-  const neu = db.prepare('SELECT * FROM goals WHERE id = ?').get(id)
+  const neu = speicher.ziel(id)
+  const user = repo.userById(neu.user_id)
   // Automatischer Abschluss, sobald der Zielwert erreicht ist
-  if (neu.status === 'laufend' && zielFortschritt(neu, repo.userById(neu.user_id)) >= 100) {
-    db.prepare("UPDATE goals SET status = 'erreicht', abgeschlossen_am = ? WHERE id = ?").run(nowIso(), id)
-  }
-  return zielAnreichern(db.prepare('SELECT * FROM goals WHERE id = ?').get(id), repo.userById(neu.user_id))
+  if (neu.status === 'laufend' && zielFortschritt(neu, user) >= 100) speicher.zielAlsErreichtMarkieren(id)
+
+  return zielAnreichern(speicher.ziel(id), user)
 }
 
-export const zielLoeschen = (id) => db.prepare('DELETE FROM goals WHERE id = ?').run(id).changes > 0
+export const zielLoeschen = (id) => speicher.zielLoeschen(id)
 
-export const zielVerlauf = (id) =>
-  db.prepare('SELECT * FROM goal_updates WHERE goal_id = ? ORDER BY erstellt_am DESC').all(id)
+export const zielVerlauf = (id) => speicher.zielVerlauf(id)
 
 /** Gewichtete Zielerreichung einer Person in Prozent. */
 export function zielerreichung(userId) {
@@ -135,63 +93,34 @@ export function zielerreichung(userId) {
 
 /* ------------------------------------------------------------------ Reviews */
 
-export const reviewsFuer = (userId) =>
-  db.prepare('SELECT * FROM reviews WHERE user_id = ? ORDER BY erstellt_am DESC').all(userId)
+export const reviewsFuer = (userId) => speicher.reviewsVon(userId)
 
-export function reviewAnlegen(daten) {
-  const info = db
-    .prepare(
-      `INSERT INTO reviews (user_id, zeitraum, status, fuehrungskraft, gespraech_am, erstellt_am)
-       VALUES (?,?,'offen',?,?,?)`,
-    )
-    .run(daten.user_id, daten.zeitraum, daten.fuehrungskraft ?? null, daten.gespraech_am ?? null, nowIso())
-  return Number(info.lastInsertRowid)
-}
+export const reviewAnlegen = (daten) => speicher.reviewAnlegen(daten)
 
 export function reviewSpeichern(id, daten) {
-  const felder = ['zeitraum', 'status', 'bewertung', 'staerken', 'entwicklung', 'selbst_text', 'gespraech_am', 'fuehrungskraft'].filter(
-    (f) => f in daten,
-  )
-  if (!felder.length) return db.prepare('SELECT * FROM reviews WHERE id = ?').get(id)
+  if (!speicher.reviewSchreiben(id, daten)) return speicher.review(id)
 
-  const satz = felder.map((f) => `${f} = ?`).join(', ')
-  db.prepare(`UPDATE reviews SET ${satz} WHERE id = ?`).run(...felder.map((f) => daten[f]), id)
-
-  const review = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id)
+  const review = speicher.review(id)
   if (daten.status === 'abgeschlossen') {
     // Zielerreichung zum Zeitpunkt des Abschlusses einfrieren - später
     // veränderte Ziele sollen die Beurteilung nicht rückwirkend verschieben
-    db.prepare('UPDATE reviews SET zielerreichung = ?, abgeschlossen_am = ? WHERE id = ?').run(
-      zielerreichung(review.user_id),
-      nowIso(),
-      id,
-    )
+    speicher.reviewAbschlussSchreiben(id, zielerreichung(review.user_id))
   }
-  return db.prepare('SELECT * FROM reviews WHERE id = ?').get(id)
+  return speicher.review(id)
 }
 
-export const reviewLoeschen = (id) => db.prepare('DELETE FROM reviews WHERE id = ?').run(id).changes > 0
+export const reviewLoeschen = (id) => speicher.reviewLoeschen(id)
 
 /* -------------------------------------------------------------- Kompetenzen */
 
-export const kompetenzen = () => db.prepare('SELECT * FROM competencies ORDER BY sortierung, name').all()
+export const kompetenzen = () => speicher.kompetenzen()
 
 /** Ist- und Soll-Stufen einer Person, für das Netzdiagramm. */
 export function kompetenzProfil(userId) {
   const alle = kompetenzen()
   return alle.map((k) => {
-    const fk = db
-      .prepare(
-        `SELECT * FROM competency_ratings WHERE user_id = ? AND competency_id = ? AND quelle = 'fuehrungskraft'
-          ORDER BY erstellt_am DESC LIMIT 1`,
-      )
-      .get(userId, k.id)
-    const selbst = db
-      .prepare(
-        `SELECT * FROM competency_ratings WHERE user_id = ? AND competency_id = ? AND quelle = 'selbst'
-          ORDER BY erstellt_am DESC LIMIT 1`,
-      )
-      .get(userId, k.id)
+    const fk = speicher.letzteBewertung(userId, k.id, 'fuehrungskraft')
+    const selbst = speicher.letzteBewertung(userId, k.id, 'selbst')
     return {
       id: k.id,
       name: k.name,
@@ -206,10 +135,7 @@ export function kompetenzProfil(userId) {
 }
 
 export function kompetenzBewerten({ user_id, competency_id, stufe, soll_stufe, quelle = 'fuehrungskraft', review_id = null }) {
-  db.prepare(
-    `INSERT INTO competency_ratings (user_id, competency_id, review_id, stufe, soll_stufe, quelle, erstellt_am)
-     VALUES (?,?,?,?,?,?,?)`,
-  ).run(user_id, competency_id, review_id, stufe, soll_stufe ?? null, quelle, nowIso())
+  speicher.bewertungAnlegen({ user_id, competency_id, review_id, stufe, soll_stufe: soll_stufe ?? null, quelle })
   return kompetenzProfil(user_id)
 }
 
@@ -250,17 +176,12 @@ export const FRAGEN = [
   'Ich würde dieses Unternehmen als Arbeitgeber weiterempfehlen.',
 ]
 
-export function umfrageAntworten(userId, runde) {
-  return db.prepare('SELECT frage, wert FROM survey_answers WHERE user_id = ? AND runde = ?').all(userId, runde)
-}
+export const umfrageAntworten = (userId, runde) => speicher.umfrageAntworten(userId, runde)
 
 export function umfrageSpeichern(userId, runde, antworten) {
-  const jetzt = nowIso()
   for (const [frage, wert] of Object.entries(antworten)) {
-    db.prepare(
-      `INSERT INTO survey_answers (user_id, runde, frage, wert, erstellt_am) VALUES (?,?,?,?,?)
-       ON CONFLICT(user_id, runde, frage) DO UPDATE SET wert = excluded.wert, erstellt_am = excluded.erstellt_am`,
-    ).run(userId, runde, frage, Math.max(1, Math.min(5, Number(wert))), jetzt)
+    // Auf die Skala 1..5 begrenzen - die Auswertung rechnet fest damit
+    speicher.umfrageAntwortSchreiben(userId, runde, frage, Math.max(1, Math.min(5, Number(wert))))
   }
   return umfrageAntworten(userId, runde)
 }
@@ -282,12 +203,10 @@ export function heatmap(runde) {
     { key: 'ohne', label: 'Ohne Review', von: null, bis: null },
   ]
 
-  const personen = repo.alleUser().map((p) => {
-    const review = db
-      .prepare("SELECT bewertung FROM reviews WHERE user_id = ? AND status = 'abgeschlossen' ORDER BY abgeschlossen_am DESC LIMIT 1")
-      .get(p.id)
-    return { id: p.id, bewertung: review?.bewertung ?? null }
-  })
+  const personen = repo.alleUser().map((p) => ({
+    id: p.id,
+    bewertung: speicher.letztesAbgeschlossenesReview(p.id)?.bewertung ?? null,
+  }))
 
   const zuStufe = (s) =>
     personen.filter((p) =>
@@ -331,7 +250,7 @@ export function heatmap(runde) {
     personen: g.mitglieder.length,
     zellen: FRAGEN.map((frage) => {
       const werte = g.mitglieder
-        .map((p) => db.prepare('SELECT wert FROM survey_answers WHERE user_id = ? AND runde = ? AND frage = ?').get(p.id, runde, frage))
+        .map((p) => speicher.umfrageWert(p.id, runde, frage))
         .filter(Boolean)
         .map((r) => r.wert)
       if (werte.length < MINDESTGRUPPE) return { frage, wert: null, n: werte.length }
@@ -359,9 +278,7 @@ export function uebersicht(user) {
 
   const zeilen = personen.map((p) => {
     const ziele = zieleFuer(p.id)
-    const review = db
-      .prepare('SELECT * FROM reviews WHERE user_id = ? ORDER BY erstellt_am DESC LIMIT 1')
-      .get(p.id)
+    const review = speicher.letztesReview(p.id)
     return {
       id: p.id,
       name: p.name,

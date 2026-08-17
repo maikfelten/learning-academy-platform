@@ -56,9 +56,9 @@ export default function Netzdiagramm({ daten, groesse = 300, zeigeSelbst = true 
       {/* Ist: die eigentliche Aussage */}
       <polygon
         points={pfad('ist')}
-        fill="var(--color-mis-gruen)"
+        fill="var(--color-akzent)"
         fillOpacity="0.26"
-        stroke="var(--color-mis-gruen)"
+        stroke="var(--color-akzent)"
         strokeWidth="2"
         strokeLinejoin="round"
       />
@@ -68,7 +68,7 @@ export default function Netzdiagramm({ daten, groesse = 300, zeigeSelbst = true 
         <polygon
           points={werte.map((d, i) => punkt(i, d.selbst ?? d.ist ?? 0).join(',')).join(' ')}
           fill="none"
-          stroke="var(--color-mis-blau)"
+          stroke="var(--color-info)"
           strokeWidth="1.5"
           strokeDasharray="4 3"
         />
@@ -114,9 +114,9 @@ export function NetzLegende({ zeigeSelbst = true }) {
   )
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-faint">
-      {eintrag('var(--color-mis-gruen)', 'ist', 'Ist-Stufe')}
+      {eintrag('var(--color-akzent)', 'ist', 'Ist-Stufe')}
       {eintrag('var(--color-anthrazit)', 'soll', 'Soll-Stufe')}
-      {zeigeSelbst && eintrag('var(--color-mis-blau)', 'linie', 'Selbsteinschätzung')}
+      {zeigeSelbst && eintrag('var(--color-info)', 'linie', 'Selbsteinschätzung')}
     </div>
   )
 }

@@ -34,7 +34,7 @@ export default function LeaderboardPage() {
           <div
             key={z.id}
             className="karte relative overflow-hidden rounded-2xl p-4"
-            style={z.ich ? { borderColor: 'color-mix(in srgb, var(--color-mis-gruen) 45%, transparent)' } : undefined}
+            style={z.ich ? { borderColor: 'color-mix(in srgb, var(--color-akzent) 45%, transparent)' } : undefined}
           >
             <span
               className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-[12px] font-bold"
@@ -90,7 +90,7 @@ export default function LeaderboardPage() {
                   <tr
                     key={z.id}
                     className="transition hover:bg-[var(--surface-hover)]"
-                    style={z.ich ? { background: 'color-mix(in srgb, var(--color-mis-gruen) 8%, transparent)' } : undefined}
+                    style={z.ich ? { background: 'color-mix(in srgb, var(--color-akzent) 8%, transparent)' } : undefined}
                   >
                     <td className="border-b px-3.5 py-2.5 font-semibold text-faint" style={{ borderColor: 'var(--tint-2)' }}>
                       {z.platz}

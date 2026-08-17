@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FastForward, Film, Lock, Pause, Play, RotateCcw } from 'lucide-react'
 import { api } from '../lib/api.js'
-import { sekundenZeit } from '../lib/format.js'
+import { akzentFarbe, sekundenZeit } from '../lib/format.js'
 import { ProgressBar } from './ui.jsx'
+import Motiv from './Motiv.jsx'
 
 /**
  * Videolektion mit Fortschrittsmessung.
@@ -16,7 +17,7 @@ import { ProgressBar } from './ui.jsx'
  * Vorspulen ist beim Erstdurchlauf strenger Kurse gesperrt (vorspulenErlaubt=false):
  * Es wird nur bis zur höchsten bereits gesehenen Position gesprungen.
  */
-export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }) {
+export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt, akzent, motiv }) {
   const laenge = lektion.video_laenge_sek ?? 300
   const [position, setPosition] = useState(Math.min(lektion.max_position_sek ?? 0, laenge))
   const [maxPosition, setMaxPosition] = useState(lektion.max_position_sek ?? 0)
@@ -138,12 +139,21 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
             border: '1px solid var(--border-soft)',
           }}
         >
-          <img
-            src="/brand/bildmarke-weiss.svg"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-[10%] bottom-[-25%] w-[55%] opacity-[0.05]"
+          {/* Dasselbe Motiv wie auf dem Cover des Kurses - der Platzhalter gehört
+              sichtbar zur Schulung und ist nicht irgendeine graue Fläche. */}
+          <Motiv
+            art={motiv ?? 'winkel'}
+            farbe={akzentFarbe(akzent)}
+            format="quer"
+            className="pointer-events-none absolute inset-0 h-full w-full"
           />
+
+          {/* Ruhiger Grund hinter der Beschriftung - das Motiv läuft darunter durch */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'radial-gradient(58% 68% at 50% 52%, rgba(12,13,13,0.88) 0%, rgba(12,13,13,0.55) 55%, transparent 82%)' }}
+          />
+
           <div className="relative flex flex-col items-center gap-4 px-6 text-center">
             <span
               className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
@@ -153,7 +163,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
             </span>
             <button
               className="grid h-16 w-16 place-items-center rounded-full transition hover:scale-105"
-              style={{ background: 'var(--color-mis-gruen)' }}
+              style={{ background: 'var(--color-akzent)' }}
               onClick={() => setLaeuft((l) => !l)}
               aria-label={laeuft ? 'Pause' : 'Wiedergabe starten'}
             >
@@ -176,7 +186,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
           <ProgressBar prozent={(position / laenge) * 100} hoehe={6} />
           <div
             className="absolute top-0 h-1.5 rounded-full opacity-30"
-            style={{ width: `${(maxPosition / laenge) * 100}%`, background: 'var(--color-mis-gruen)' }}
+            style={{ width: `${(maxPosition / laenge) * 100}%`, background: 'var(--color-akzent)' }}
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-faint">
@@ -201,7 +211,7 @@ export default function LessonVideo({ lektion, vorspulenErlaubt, onFortschritt }
                 Demo: 1 Minute weiter
               </button>
             )}
-            <span className="font-semibold" style={{ color: prozent >= 95 ? 'var(--color-mis-gruen)' : undefined }}>
+            <span className="font-semibold" style={{ color: prozent >= 95 ? 'var(--color-akzent)' : undefined }}>
               {prozent} % gesehen
             </span>
           </div>

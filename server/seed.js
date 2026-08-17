@@ -23,6 +23,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { db, MEDIA_DIR } from './db.js'
 import { hashPassword } from './auth.js'
 import { addDays, addMonths, nowIso, uuid, zertifikatNummer } from './util.js'
+import { youtubeIdAus } from '../shared/youtube.js'
 import { konfiguration } from './config.js'
 
 const JETZT = nowIso()
@@ -1669,8 +1670,8 @@ function kursEinfuegen(k, sortierung) {
     const quizId = l.quiz ? quizEinfuegen(l.quiz) : null
     db.prepare(
       `INSERT INTO lessons (course_id, position, titel, typ, dauer_min, video_datei, video_laenge_sek,
-                            text_inhalt, pdf_datei, link_url, link_hinweis, link_nachweis, quiz_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                            text_inhalt, pdf_datei, link_url, link_hinweis, link_nachweis, quiz_id, youtube_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(
       courseId,
       i + 1,
@@ -1685,6 +1686,9 @@ function kursEinfuegen(k, sortierung) {
       l.link_hinweis ?? null,
       l.link_nachweis ? 1 : 0,
       quizId,
+      // Aus einer vollständigen YouTube-Adresse wird die ID gezogen - so kann in
+      // den Inhalten die Adresse stehen, die man aus dem Browser kopiert.
+      l.youtube_url ? youtubeIdAus(l.youtube_url) : (l.youtube_id ?? null),
     )
   })
 

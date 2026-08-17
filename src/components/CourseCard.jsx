@@ -10,16 +10,44 @@ import { akzentFarbe, akzentText, dauer } from '../lib/format.js'
  * überfälligen Pflichtschulungen: dort ist das Signal gewollt.
  */
 
-/** Hohe Kachel im Regal-Stil (Cover + Fußzeile). */
-export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
+/**
+ * Hohe Kachel im Regal-Stil (Cover + Fußzeile).
+ *
+ * `fluid` schaltet von der festen Regalbreite auf volle Zellenbreite um - so
+ * dient dieselbe Kachel sowohl der waagerecht scrollenden Reihe als auch dem
+ * Raster in der Kategorieansicht.
+ *
+ * Die ganze Kachel ist das Klickziel. Damit sie auch per Tastatur erreichbar
+ * ist, trägt sie role/tabIndex und reagiert auf Enter und Leertaste - ein
+ * bloßes onClick auf einem <article> wäre für Tastatur und Screenreader
+ * unsichtbar. Ein echtes <button> geht nicht, weil die Merken-Schaltfläche
+ * darin liegt und verschachtelte Buttons ungültig sind.
+ */
+export function CourseCard({ kurs, onOeffnen, onSpeichern, fluid = false }) {
   const farbe = akzentFarbe(kurs.akzent)
+  const oeffnen = () => onOeffnen(kurs.slug)
   return (
     <article
-      className="karte group relative flex w-[190px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-2xl hover:-translate-y-1"
-      onClick={() => onOeffnen(kurs.slug)}
+      className={`karte group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl hover:-translate-y-1 ${
+        fluid ? 'w-full' : 'w-[190px] shrink-0'
+      }`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${kurs.titel} öffnen`}
+      onClick={oeffnen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          oeffnen()
+        }
+      }}
     >
       <div className="relative">
-        <CourseCover kurs={kurs} className="h-[248px] w-full" />
+        <CourseCover
+          kurs={kurs}
+          groesse={fluid ? 'lg' : 'md'}
+          className={fluid ? 'aspect-[2/3] w-full' : 'h-[248px] w-full'}
+        />
         {kurs.pflicht && (
           <span
             className="absolute left-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
@@ -29,7 +57,7 @@ export function CourseCard({ kurs, onOeffnen, onSpeichern }) {
           </span>
         )}
         <button
-          className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full text-white shadow-lg transition hover:scale-105"
+          className="merken-knopf absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full text-white shadow-lg transition hover:scale-105"
           style={{
             background: kurs.gespeichert ? farbe : 'rgba(20,21,21,0.72)',
             border: '1px solid rgba(255,255,255,0.18)',

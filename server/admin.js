@@ -3,39 +3,31 @@
  *
  * Bewusst getrennt von server/api.js, damit die Lernendensicht klein bleibt und
  * man auf einen Blick sieht, was überhaupt schreibend auf Inhalte zugreift.
- * SQL steht auch hier nicht - alles geht über server/repo.js bzw. die wenigen
- * Schreibfunktionen unten, die eng an das Schema gebunden sind.
+ *
+ * SQL steht hier nicht: Lesen und Schreiben laufen über server/repo.js (Sicht
+ * der Lernenden) und server/repo-admin.js (Verwaltung). Dieses Modul kennt nur
+ * die Verwaltungsregeln - Vorgabewerte, Slug-Bildung, Zusammenstellung der
+ * Editoransicht. Der Grund für die Trennung ist der geplante Wechsel auf die
+ * Datenstruktur des Unternehmens; geprüft wird sie mit `npm run pruefen`.
  */
 
-import { mkdirSync, writeFileSync, statSync, existsSync } from 'node:fs'
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { db, MEDIA_DIR } from './db.js'
+import { MEDIA_DIR } from './db.js'
 import * as repo from './repo.js'
+import * as speicher from './repo-admin.js'
 import { hashPassword } from './auth.js'
-import { nowIso, safeFileName, token, uuid } from './util.js'
-import { konfiguration } from './config.js'
+import { nowIso, safeFileName, token } from './util.js'
 import { levelBerechnen } from './level.js'
+import { konfiguration } from './config.js'
 
 /* ------------------------------------------------------------------- Kurse */
 
-const KURS_FELDER = [
-  'titel', 'untertitel', 'beschreibung', 'kategorie', 'anbieter', 'pflicht', 'turnus_monate',
-  'vorwarn_tage', 'onboarding_frist_tage', 'strenge', 'akzent', 'cover_motiv', 'cover_bild',
-  'demo', 'veroeffentlicht', 'entwurf', 'highlight', 'sortierung',
-]
-
 export function kurseFuerVerwaltung() {
-  const kurse = db
-    .prepare('SELECT * FROM courses ORDER BY sortierung, titel')
-    .all()
-  return kurse.map((k) => {
-    const lektionen = db.prepare('SELECT typ, sichtbar FROM lessons WHERE course_id = ?').all(k.id)
-    const teilnehmer = db
-      .prepare('SELECT COUNT(DISTINCT user_id) AS n FROM course_starts WHERE course_id = ?')
-      .get(k.id).n
-    const abgeschlossen = db
-      .prepare('SELECT COUNT(DISTINCT user_id) AS n FROM completions WHERE course_id = ? AND storniert_am IS NULL')
-      .get(k.id).n
+  return speicher.alleKurseRoh().map((k) => {
+    const lektionen = speicher.lektionArten(k.id)
+    const teilnehmer = speicher.teilnehmerAnzahl(k.id)
+    const abgeschlossen = speicher.abschlussAnzahl(k.id)
     return {
       ...k,
       lektionen_anzahl: lektionen.length,
@@ -48,39 +40,26 @@ export function kurseFuerVerwaltung() {
 }
 
 export function kursFuerVerwaltung(slug) {
-  const kurs = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug)
+  const kurs = speicher.kursBySlugRoh(slug)
   if (!kurs) return null
 
-  const lektionen = db
-    .prepare('SELECT * FROM lessons WHERE course_id = ? ORDER BY position')
-    .all(kurs.id)
-    .map((l) => {
-      // Fortschritt direkt im Editor sichtbar - kein Wechsel in eine andere Ansicht
-      const stat = db
-        .prepare(
-          `SELECT COUNT(*) AS gesamt, SUM(CASE WHEN status = 'abgeschlossen' THEN 1 ELSE 0 END) AS fertig
-             FROM lesson_progress WHERE lesson_id = ?`,
-        )
-        .get(l.id)
-      const quiz = l.quiz_id ? db.prepare('SELECT * FROM quizzes WHERE id = ?').get(l.quiz_id) : null
-      return {
-        ...l,
-        video_vorhanden: !!(l.video_datei && existsSync(join(MEDIA_DIR, l.video_datei))),
-        bearbeiter: stat.gesamt ?? 0,
-        abgeschlossen: stat.fertig ?? 0,
-        quiz: quiz
-          ? { ...quiz, fragen_gesamt: db.prepare('SELECT COUNT(*) AS n FROM questions WHERE quiz_id = ?').get(quiz.id).n }
-          : null,
-      }
-    })
+  const lektionen = speicher.lektionenRoh(kurs.id).map((l) => {
+    // Fortschritt direkt im Editor sichtbar - kein Wechsel in eine andere Ansicht
+    const stat = speicher.lektionFortschritt(l.id)
+    const quiz = l.quiz_id ? speicher.quizRoh(l.quiz_id) : null
+    return {
+      ...l,
+      video_vorhanden: !!(l.video_datei && existsSync(join(MEDIA_DIR, l.video_datei))),
+      bearbeiter: stat.gesamt ?? 0,
+      abgeschlossen: stat.fertig ?? 0,
+      quiz: quiz ? { ...quiz, fragen_gesamt: speicher.fragenAnzahl(quiz.id) } : null,
+    }
+  })
 
-  const zuweisungen = db.prepare('SELECT * FROM assignments WHERE course_id = ?').all(kurs.id)
-
-  return { ...kurs, lektionen, zuweisungen }
+  return { ...kurs, lektionen, zuweisungen: speicher.zuweisungenRoh(kurs.id) }
 }
 
 export function kursAnlegen(daten) {
-  const jetzt = nowIso()
   const basis = (daten.titel || 'neuer-kurs')
     .toLowerCase()
     .replace(/[äöü]/g, (z) => ({ ä: 'ae', ö: 'oe', ü: 'ue' })[z])
@@ -91,82 +70,52 @@ export function kursAnlegen(daten) {
 
   let slug = basis || 'kurs'
   let n = 2
-  while (db.prepare('SELECT 1 FROM courses WHERE slug = ?').get(slug)) slug = `${basis}-${n++}`
+  while (speicher.slugVergeben(slug)) slug = `${basis}-${n++}`
 
-  const info = db
-    .prepare(
-      `INSERT INTO courses (slug, titel, untertitel, beschreibung, kategorie, anbieter, pflicht, turnus_monate,
-                            vorwarn_tage, onboarding_frist_tage, strenge, dauer_min, akzent, cover_motiv, demo,
-                            veroeffentlicht, entwurf, sortierung, highlight, erstellt_am, aktualisiert_am)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,0,1,?,0,?,?)`,
-    )
-    .run(
-      slug,
-      daten.titel ?? 'Neuer Kurs',
-      daten.untertitel ?? null,
-      daten.beschreibung ?? null,
-      daten.kategorie ?? 'KI & Digitales',
-      daten.anbieter ?? konfiguration.plattform,
-      daten.pflicht ? 1 : 0,
-      daten.turnus_monate ?? null,
-      daten.vorwarn_tage ?? 30,
-      daten.onboarding_frist_tage ?? null,
-      daten.strenge ?? 'frei',
-      daten.akzent ?? 'anthrazit',
-      daten.cover_motiv ?? 'raute',
-      daten.demo ? 1 : 0,
-      daten.sortierung ?? 99,
-      jetzt,
-      jetzt,
-    )
+  const id = speicher.kursAnlegen(slug, {
+    titel: daten.titel ?? 'Neuer Kurs',
+    untertitel: daten.untertitel ?? null,
+    beschreibung: daten.beschreibung ?? null,
+    kategorie: daten.kategorie ?? 'KI & Digitales',
+    anbieter: daten.anbieter ?? konfiguration.plattform,
+    pflicht: daten.pflicht ? 1 : 0,
+    turnus_monate: daten.turnus_monate ?? null,
+    vorwarn_tage: daten.vorwarn_tage ?? 30,
+    onboarding_frist_tage: daten.onboarding_frist_tage ?? null,
+    strenge: daten.strenge ?? 'frei',
+    akzent: daten.akzent ?? 'anthrazit',
+    cover_motiv: daten.cover_motiv ?? 'raute',
+    demo: daten.demo ? 1 : 0,
+    sortierung: daten.sortierung ?? 99,
+  })
 
-  db.prepare('INSERT INTO assignments (course_id, ziel_typ, ziel_wert, pflicht, erstellt_am) VALUES (?,?,?,?,?)').run(
-    Number(info.lastInsertRowid),
-    'alle',
-    null,
-    daten.pflicht ? 1 : 0,
-    jetzt,
-  )
+  // Ohne Zuweisung sieht die Schulung niemand - deshalb erst einmal für alle
+  speicher.zuweisungAnlegen(id, 'alle', null, daten.pflicht)
   return slug
 }
 
 export function kursSpeichern(slug, daten) {
-  const kurs = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug)
+  const kurs = speicher.kursBySlugRoh(slug)
   if (!kurs) return null
 
-  const felder = KURS_FELDER.filter((f) => f in daten)
-  if (felder.length) {
-    const satz = felder.map((f) => `${f} = ?`).join(', ')
-    const werte = felder.map((f) => {
-      const v = daten[f]
-      return typeof v === 'boolean' ? (v ? 1 : 0) : v
-    })
-    db.prepare(`UPDATE courses SET ${satz}, aktualisiert_am = ? WHERE id = ?`).run(...werte, nowIso(), kurs.id)
-  }
+  speicher.kursSchreiben(kurs.id, daten)
 
   if (Array.isArray(daten.zuweisungen)) {
-    db.prepare('DELETE FROM assignments WHERE course_id = ?').run(kurs.id)
-    for (const z of daten.zuweisungen) {
-      db.prepare('INSERT INTO assignments (course_id, ziel_typ, ziel_wert, pflicht, erstellt_am) VALUES (?,?,?,?,?)').run(
-        kurs.id,
-        z.ziel_typ,
-        z.ziel_wert ?? null,
-        daten.pflicht ?? kurs.pflicht ? 1 : 0,
-        nowIso(),
-      )
-    }
+    speicher.zuweisungenLoeschen(kurs.id)
+    const pflicht = daten.pflicht ?? kurs.pflicht
+    for (const z of daten.zuweisungen) speicher.zuweisungAnlegen(kurs.id, z.ziel_typ, z.ziel_wert, pflicht)
   }
 
-  dauerNeuBerechnen(kurs.id)
+  speicher.dauerNeuBerechnen(kurs.id)
   return kursFuerVerwaltung(slug)
 }
 
 /** Reihenfolge, Kapitelzuordnung und Inhalte der Lektionen in einem Rutsch. */
 export function lektionenSpeichern(slug, lektionen) {
-  const kurs = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug)
+  const kurs = speicher.kursBySlugRoh(slug)
   if (!kurs) return null
 
-  const bestehende = db.prepare('SELECT id FROM lessons WHERE course_id = ?').all(kurs.id).map((l) => l.id)
+  const bestehende = speicher.lektionIds(kurs.id)
   const behalten = new Set()
 
   lektionen.forEach((l, i) => {
@@ -191,41 +140,23 @@ export function lektionenSpeichern(slug, lektionen) {
     ]
 
     if (l.id && bestehende.includes(Number(l.id))) {
-      db.prepare(
-        `UPDATE lessons SET position = ?, titel = ?, typ = ?, dauer_min = ?, video_datei = ?, video_laenge_sek = ?,
-                text_inhalt = ?, pdf_datei = ?, link_url = ?, link_hinweis = ?, link_nachweis = ?, kapitel = ?,
-                unterkapitel = ?, sichtbar = ?, audio_datei = ?, youtube_id = ?, scorm_paket = ?
-          WHERE id = ?`,
-      ).run(...werte, Number(l.id))
+      speicher.lektionSchreiben(Number(l.id), werte)
       behalten.add(Number(l.id))
     } else {
-      const info = db
-        .prepare(
-          `INSERT INTO lessons (course_id, position, titel, typ, dauer_min, video_datei, video_laenge_sek,
-                                text_inhalt, pdf_datei, link_url, link_hinweis, link_nachweis, kapitel,
-                                unterkapitel, sichtbar, audio_datei, youtube_id, scorm_paket)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(kurs.id, ...werte)
-      behalten.add(Number(info.lastInsertRowid))
+      behalten.add(speicher.lektionAnlegen(kurs.id, werte))
     }
   })
 
   // Entfernte Lektionen löschen - Fortschritt dazu verschwindet mit (FK-Kaskade)
-  for (const id of bestehende) if (!behalten.has(id)) db.prepare('DELETE FROM lessons WHERE id = ?').run(id)
+  for (const id of bestehende) if (!behalten.has(id)) speicher.lektionLoeschen(id)
 
-  dauerNeuBerechnen(kurs.id)
+  speicher.dauerNeuBerechnen(kurs.id)
   return kursFuerVerwaltung(slug)
-}
-
-function dauerNeuBerechnen(courseId) {
-  const summe = db.prepare('SELECT COALESCE(SUM(dauer_min),0) AS s FROM lessons WHERE course_id = ?').get(courseId).s
-  db.prepare('UPDATE courses SET dauer_min = ?, aktualisiert_am = ? WHERE id = ?').run(summe, nowIso(), courseId)
 }
 
 /** Kurs als Vorlage klonen - inklusive Lektionen und Quizzen. */
 export function kursKlonen(slug) {
-  const quelle = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug)
+  const quelle = speicher.kursBySlugRoh(slug)
   if (!quelle) return null
 
   const neuerSlug = kursAnlegen({
@@ -234,60 +165,17 @@ export function kursKlonen(slug) {
     pflicht: !!quelle.pflicht,
     demo: !!quelle.demo,
   })
-  const ziel = db.prepare('SELECT * FROM courses WHERE slug = ?').get(neuerSlug)
+  const ziel = speicher.kursBySlugRoh(neuerSlug)
 
-  for (const l of db.prepare('SELECT * FROM lessons WHERE course_id = ? ORDER BY position').all(quelle.id)) {
-    let quizId = null
-    if (l.quiz_id) {
-      const q = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(l.quiz_id)
-      const qi = db
-        .prepare(
-          `INSERT INTO quizzes (titel, bestehensgrenze, pool_aktiv, fragen_anzahl, antworten_mischen, sperrzeit_stunden,
-                                max_versuche_zeitraum, zeitraum_tage, harte_obergrenze, aufloesung_nichtbestanden,
-                                zeitlimit_min, erstellt_am)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          q.titel, q.bestehensgrenze, q.pool_aktiv, q.fragen_anzahl, q.antworten_mischen, q.sperrzeit_stunden,
-          q.max_versuche_zeitraum, q.zeitraum_tage, q.harte_obergrenze, q.aufloesung_nichtbestanden,
-          q.zeitlimit_min, nowIso(),
-        )
-      quizId = Number(qi.lastInsertRowid)
-
-      for (const f of db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY position').all(q.id)) {
-        const fi = db
-          .prepare(
-            'INSERT INTO questions (quiz_id, position, typ, frage, thema, punkte, erklaerung, musterloesung) VALUES (?,?,?,?,?,?,?,?)',
-          )
-          .run(quizId, f.position, f.typ, f.frage, f.thema, f.punkte, f.erklaerung, f.musterloesung)
-        for (const a of db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY position').all(f.id)) {
-          db.prepare('INSERT INTO answers (question_id, position, text, korrekt) VALUES (?,?,?,?)').run(
-            Number(fi.lastInsertRowid), a.position, a.text, a.korrekt,
-          )
-        }
-      }
-    }
-
-    db.prepare(
-      `INSERT INTO lessons (course_id, position, titel, typ, dauer_min, video_datei, video_laenge_sek, text_inhalt,
-                            pdf_datei, link_url, link_hinweis, link_nachweis, quiz_id, kapitel, unterkapitel,
-                            sichtbar, audio_datei, youtube_id, scorm_paket)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    ).run(
-      ziel.id, l.position, l.titel, l.typ, l.dauer_min, l.video_datei, l.video_laenge_sek, l.text_inhalt,
-      l.pdf_datei, l.link_url, l.link_hinweis, l.link_nachweis, quizId, l.kapitel, l.unterkapitel,
-      l.sichtbar, l.audio_datei, l.youtube_id, l.scorm_paket,
-    )
-  }
-
-  dauerNeuBerechnen(ziel.id)
+  speicher.inhalteKopieren(quelle.id, ziel.id)
+  speicher.dauerNeuBerechnen(ziel.id)
   return neuerSlug
 }
 
 export function kursLoeschen(slug) {
-  const kurs = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug)
+  const kurs = speicher.kursBySlugRoh(slug)
   if (!kurs) return false
-  db.prepare('DELETE FROM courses WHERE id = ?').run(kurs.id)
+  speicher.kursLoeschen(kurs.id)
   return true
 }
 
@@ -322,10 +210,10 @@ export function medienUpload({ datei_name, datei_base64, ordner = 'kurse' }) {
 /* ---------------------------------------------------------------- Personen */
 
 export function personenListe({ suche = '', standort = '', abteilung = '', rolle = '', status = '' } = {}) {
-  const alle = db.prepare('SELECT * FROM users ORDER BY name').all()
   const q = suche.trim().toLowerCase()
 
-  return alle
+  return speicher
+    .allePersonenRoh()
     .filter((p) => (!q || `${p.name} ${p.email} ${p.position ?? ''}`.toLowerCase().includes(q)))
     .filter((p) => !standort || p.standort === standort)
     .filter((p) => !abteilung || p.abteilung === abteilung)
@@ -371,19 +259,6 @@ export function personDetail(id) {
       ...repo.kursStatus(p, k, zuweisungen.get(k.id).pflicht),
     }))
 
-  const verlauf = db
-    .prepare('SELECT ts, aktion, objekt FROM audit_log WHERE user_id = ? ORDER BY ts DESC LIMIT 40')
-    .all(p.id)
-
-  const versuche = db
-    .prepare(
-      `SELECT a.beendet_am, a.prozent, a.bestanden, q.titel
-         FROM quiz_attempts a JOIN quizzes q ON q.id = a.quiz_id
-        WHERE a.user_id = ? AND a.beendet_am IS NOT NULL
-        ORDER BY a.beendet_am DESC LIMIT 20`,
-    )
-    .all(p.id)
-
   return {
     person: {
       id: p.id, name: p.name, email: p.email, rolle: p.rolle, standort: p.standort,
@@ -394,22 +269,14 @@ export function personDetail(id) {
     },
     kurse,
     nachweise: repo.abschluesse(p.id),
-    versuche,
-    verlauf,
+    versuche: speicher.beendeteVersuche(p.id),
+    verlauf: speicher.auditVerlauf(p.id),
   }
 }
 
-const PERSON_FELDER = ['name', 'email', 'rolle', 'standort', 'abteilung', 'position', 'eintrittsdatum', 'aktiv']
-
 export function personSpeichern(id, daten) {
-  const p = repo.userById(id)
-  if (!p) return null
-  const felder = PERSON_FELDER.filter((f) => f in daten)
-  if (felder.length) {
-    const satz = felder.map((f) => `${f} = ?`).join(', ')
-    const werte = felder.map((f) => (typeof daten[f] === 'boolean' ? (daten[f] ? 1 : 0) : daten[f]))
-    db.prepare(`UPDATE users SET ${satz} WHERE id = ?`).run(...werte, id)
-  }
+  if (!repo.userById(id)) return null
+  speicher.personSchreiben(id, daten)
   return personDetail(id)
 }
 
@@ -423,7 +290,7 @@ export function personAnlegen(daten) {
     email: daten.email,
     name: daten.name,
     rolle: daten.rolle ?? 'lernender',
-    standort: daten.standort ?? 'Werk Nord',
+    standort: daten.standort ?? 'Standort A',
     abteilung: daten.abteilung ?? 'Verwaltung',
     position: daten.position ?? null,
     eintrittsdatum: daten.eintrittsdatum ?? nowIso(),
@@ -475,7 +342,7 @@ export function csvImport(csv) {
         name: satz.name,
         email: satz.email,
         rolle: ['admin', 'fuehrungskraft', 'lernender'].includes(satz.rolle) ? satz.rolle : 'lernender',
-        standort: satz.standort || 'Werk Nord',
+        standort: satz.standort || 'Standort A',
         abteilung: satz.abteilung || 'Verwaltung',
         position: satz.position || null,
         eintrittsdatum: satz.eintrittsdatum ? `${satz.eintrittsdatum}T08:00:00.000Z` : nowIso(),
@@ -499,7 +366,7 @@ const STANDARD_EINSTELLUNG = {
 }
 
 export function benachrichtigungenLesen(userId) {
-  const row = db.prepare('SELECT * FROM notification_settings WHERE user_id = ?').get(userId)
+  const row = speicher.benachrichtigungRoh(userId)
   if (!row) return { ...STANDARD_EINSTELLUNG }
   return {
     email_aktiv: !!row.email_aktiv,
@@ -511,22 +378,7 @@ export function benachrichtigungenLesen(userId) {
 }
 
 export function benachrichtigungenSpeichern(userId, daten) {
-  const alt = benachrichtigungenLesen(userId)
-  const neu = { ...alt, ...daten }
-  db.prepare(
-    `INSERT INTO notification_settings (user_id, email_aktiv, push_aktiv, inapp_aktiv, rhythmus, ereignisse, aktualisiert_am)
-     VALUES (?,?,?,?,?,?,?)
-     ON CONFLICT(user_id) DO UPDATE SET email_aktiv = excluded.email_aktiv, push_aktiv = excluded.push_aktiv,
-       inapp_aktiv = excluded.inapp_aktiv, rhythmus = excluded.rhythmus, ereignisse = excluded.ereignisse,
-       aktualisiert_am = excluded.aktualisiert_am`,
-  ).run(
-    userId,
-    neu.email_aktiv ? 1 : 0,
-    neu.push_aktiv ? 1 : 0,
-    neu.inapp_aktiv ? 1 : 0,
-    neu.rhythmus,
-    JSON.stringify(neu.ereignisse),
-    nowIso(),
-  )
+  const neu = { ...benachrichtigungenLesen(userId), ...daten }
+  speicher.benachrichtigungSchreiben(userId, neu)
   return benachrichtigungenLesen(userId)
 }
